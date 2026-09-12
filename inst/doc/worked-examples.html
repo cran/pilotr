@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Worked examples</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Worked examples</h1>
+
+
+
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(pilotr)</span></code></pre></div>
+<p>pilotr ships one ready-to-run specification per design family. The
+same JSON files drive the Python twin and the no-code app, so a design
+authored once runs unchanged across all three.
+<code>pilotr_example()</code> lists them, and returns the path to each
+for <code>load_spec()</code>.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">pilotr_example</span>()</span></code></pre></div>
+<pre><code>[1] &quot;beta_proportion&quot;         &quot;between_2group_gaussian&quot;
+[3] &quot;crossed_mixed_rt&quot;        &quot;nested_clusters&quot;        
+[5] &quot;ordinal_likert_between&quot;  &quot;partial_crossing&quot;       
+[7] &quot;poisson_counts_between&quot;  &quot;reading_time_continuous&quot;</code></pre>
+<p>Each specification is simulated below, showing the family it draws
+from and the first rows of the data it produces. The specification
+format itself is covered in the <a href="getting-started.html">Get
+started</a> article.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>desc <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  <span class="at">between_2group_gaussian =</span> <span class="st">&quot;Two-group between-subjects Gaussian.&quot;</span>,</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="at">crossed_mixed_rt        =</span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>    <span class="st">&quot;Crossed by-subject and by-item reaction times, shifted lognormal.&quot;</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="at">beta_proportion         =</span> <span class="st">&quot;Bounded proportions through the Beta family.&quot;</span>,</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  <span class="at">ordinal_likert_between  =</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    <span class="st">&quot;Five-point Likert responses via a cumulative-logit model.&quot;</span>,</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>  <span class="at">poisson_counts_between  =</span> <span class="st">&quot;Count outcomes through a log link.&quot;</span>,</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>  <span class="at">reading_time_continuous =</span></span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>    <span class="st">&quot;A continuous predictor with a lognormal reading-time outcome.&quot;</span>,</span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>  <span class="at">nested_clusters         =</span></span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>    <span class="st">&quot;Subjects nested in higher-level clusters, an extra grouping factor.&quot;</span>,</span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>  <span class="at">partial_crossing        =</span> <span class="st">&quot;Each subject sees a sampled subset of items.&quot;</span></span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>)</span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a></span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a><span class="cf">for</span> (name <span class="cf">in</span> <span class="fu">pilotr_example</span>()) {</span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a>  spec <span class="ot">&lt;-</span> <span class="fu">load_spec</span>(<span class="fu">pilotr_example</span>(name))</span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a>  d <span class="ot">&lt;-</span> <span class="fu">simulate_design</span>(spec)</span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a>  blurb <span class="ot">&lt;-</span> <span class="cf">if</span> (name <span class="sc">%in%</span> <span class="fu">names</span>(desc)) desc[[name]] <span class="cf">else</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">&quot;</span><span class="sc">\n</span><span class="st">### %s</span><span class="sc">\n\n</span><span class="st">&quot;</span>, name))</span>
+<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">&quot;%s The `%s` family, %d rows.</span><span class="sc">\n\n</span><span class="st">&quot;</span>,</span>
+<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a>              blurb, spec<span class="sc">$</span>response<span class="sc">$</span>family, <span class="fu">nrow</span>(d)))</span>
+<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a>  <span class="co"># These tables are printed data, so they take the site&#39;s code size rather</span></span>
+<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a>  <span class="co"># than the prose size a pipe table would inherit. The class is what the</span></span>
+<span id="cb4-25"><a href="#cb4-25" tabindex="-1"></a>  <span class="co"># stylesheet keys on, and table.attr reaches the output only for</span></span>
+<span id="cb4-26"><a href="#cb4-26" tabindex="-1"></a>  <span class="co"># format = &quot;html&quot;, since pipe output discards it.</span></span>
+<span id="cb4-27"><a href="#cb4-27" tabindex="-1"></a>  <span class="fu">cat</span>(knitr<span class="sc">::</span><span class="fu">kable</span>(<span class="fu">head</span>(d, <span class="dv">4</span>), <span class="at">format =</span> <span class="st">&quot;html&quot;</span>,</span>
+<span id="cb4-28"><a href="#cb4-28" tabindex="-1"></a>                   <span class="at">table.attr =</span> <span class="st">&#39;class=&quot;table data-output&quot;&#39;</span>), <span class="at">sep =</span> <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)</span>
+<span id="cb4-29"><a href="#cb4-29" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="st">&quot;</span><span class="sc">\n\n</span><span class="st">&quot;</span>)</span>
+<span id="cb4-30"><a href="#cb4-30" tabindex="-1"></a>}</span></code></pre></div>
+<div id="beta_proportion" class="section level3">
+<h3>beta_proportion</h3>
+<p>Bounded proportions through the Beta family. The <code>beta</code>
+family, 200 rows.</p>
+<table class="table data-output">
+<thead>
+<tr>
+<th style="text-align:right;">
+subject
+</th>
+<th style="text-align:left;">
+group
+</th>
+<th style="text-align:right;">
+prop
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+control
+</td>
+<td style="text-align:right;">
+0.29928
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:left;">
+control
+</td>
+<td style="text-align:right;">
+0.54044
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+control
+</td>
+<td style="text-align:right;">
+0.25637
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+4
+</td>
+<td style="text-align:left;">
+control
+</td>
+<td style="text-align:right;">
+0.33684
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="between_2group_gaussian" class="section level3">
+<h3>between_2group_gaussian</h3>
+<p>Two-group between-subjects Gaussian. The <code>gaussian</code>
+family, 64 rows.</p>
+<table class="table data-output">
+<thead>
+<tr>
+<th style="text-align:right;">
+subject
+</th>
+<th style="text-align:left;">
+group
+</th>
+<th style="text-align:right;">
+score
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+control
+</td>
+<td style="text-align:right;">
+95.7157
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:left;">
+control
+</td>
+<td style="text-align:right;">
+90.0921
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+control
+</td>
+<td style="text-align:right;">
+119.1958
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+4
+</td>
+<td style="text-align:left;">
+control
+</td>
+<td style="text-align:right;">
+86.4388
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="crossed_mixed_rt" class="section level3">
+<h3>crossed_mixed_rt</h3>
+<p>Crossed by-subject and by-item reaction times, shifted lognormal. The
+<code>shifted_lognormal</code> family, 1440 rows.</p>
+<table class="table data-output">
+<thead>
+<tr>
+<th style="text-align:right;">
+subject
+</th>
+<th style="text-align:right;">
+item
+</th>
+<th style="text-align:left;">
+condition
+</th>
+<th style="text-align:right;">
+RT
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+related
+</td>
+<td style="text-align:right;">
+668.6564
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+unrelated
+</td>
+<td style="text-align:right;">
+727.3870
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:left;">
+related
+</td>
+<td style="text-align:right;">
+699.1907
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:left;">
+unrelated
+</td>
+<td style="text-align:right;">
+502.9760
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="nested_clusters" class="section level3">
+<h3>nested_clusters</h3>
+<p>Subjects nested in higher-level clusters, an extra grouping factor.
+The <code>gaussian</code> family, 4800 rows.</p>
+<table class="table data-output">
+<thead>
+<tr>
+<th style="text-align:right;">
+subject
+</th>
+<th style="text-align:right;">
+item
+</th>
+<th style="text-align:right;">
+site
+</th>
+<th style="text-align:left;">
+condition
+</th>
+<th style="text-align:right;">
+y
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+a
+</td>
+<td style="text-align:right;">
+0.16487
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+b
+</td>
+<td style="text-align:right;">
+2.11132
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+a
+</td>
+<td style="text-align:right;">
+0.72468
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+b
+</td>
+<td style="text-align:right;">
+1.70270
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="ordinal_likert_between" class="section level3">
+<h3>ordinal_likert_between</h3>
+<p>Five-point Likert responses via a cumulative-logit model. The
+<code>ordinal</code> family, 400 rows.</p>
+<table class="table data-output">
+<thead>
+<tr>
+<th style="text-align:right;">
+subject
+</th>
+<th style="text-align:left;">
+group
+</th>
+<th style="text-align:right;">
+rating
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+control
+</td>
+<td style="text-align:right;">
+2
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:left;">
+control
+</td>
+<td style="text-align:right;">
+4
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+control
+</td>
+<td style="text-align:right;">
+3
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+4
+</td>
+<td style="text-align:left;">
+control
+</td>
+<td style="text-align:right;">
+3
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="partial_crossing" class="section level3">
+<h3>partial_crossing</h3>
+<p>Each subject sees a sampled subset of items. The
+<code>gaussian</code> family, 1440 rows.</p>
+<table class="table data-output">
+<thead>
+<tr>
+<th style="text-align:right;">
+subject
+</th>
+<th style="text-align:right;">
+item
+</th>
+<th style="text-align:left;">
+condition
+</th>
+<th style="text-align:right;">
+rt
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+a
+</td>
+<td style="text-align:right;">
+393.4013
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+b
+</td>
+<td style="text-align:right;">
+532.2501
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+5
+</td>
+<td style="text-align:left;">
+a
+</td>
+<td style="text-align:right;">
+524.1783
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+5
+</td>
+<td style="text-align:left;">
+b
+</td>
+<td style="text-align:right;">
+632.9765
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="poisson_counts_between" class="section level3">
+<h3>poisson_counts_between</h3>
+<p>Count outcomes through a log link. The <code>poisson</code> family,
+2000 rows.</p>
+<table class="table data-output">
+<thead>
+<tr>
+<th style="text-align:right;">
+subject
+</th>
+<th style="text-align:left;">
+group
+</th>
+<th style="text-align:right;">
+count
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+control
+</td>
+<td style="text-align:right;">
+3
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:left;">
+control
+</td>
+<td style="text-align:right;">
+5
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+control
+</td>
+<td style="text-align:right;">
+3
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+4
+</td>
+<td style="text-align:left;">
+control
+</td>
+<td style="text-align:right;">
+9
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="reading_time_continuous" class="section level3">
+<h3>reading_time_continuous</h3>
+<p>A continuous predictor with a lognormal reading-time outcome. The
+<code>lognormal</code> family, 4000 rows.</p>
+<table class="table data-output">
+<thead>
+<tr>
+<th style="text-align:right;">
+subject
+</th>
+<th style="text-align:right;">
+item
+</th>
+<th style="text-align:left;">
+narration
+</th>
+<th style="text-align:right;">
+SyntaxPC
+</th>
+<th style="text-align:right;">
+CoherencePC
+</th>
+<th style="text-align:right;">
+age
+</th>
+<th style="text-align:right;">
+reading_time_per_word
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+off
+</td>
+<td style="text-align:right;">
+-1.739797
+</td>
+<td style="text-align:right;">
+-0.0215117
+</td>
+<td style="text-align:right;">
+0.0632888
+</td>
+<td style="text-align:right;">
+0.37485
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+on
+</td>
+<td style="text-align:right;">
+-1.739797
+</td>
+<td style="text-align:right;">
+-0.0215117
+</td>
+<td style="text-align:right;">
+0.0632888
+</td>
+<td style="text-align:right;">
+0.32765
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:left;">
+off
+</td>
+<td style="text-align:right;">
+-1.891749
+</td>
+<td style="text-align:right;">
+0.7268579
+</td>
+<td style="text-align:right;">
+0.0632888
+</td>
+<td style="text-align:right;">
+0.15592
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:left;">
+on
+</td>
+<td style="text-align:right;">
+-1.891749
+</td>
+<td style="text-align:right;">
+0.7268579
+</td>
+<td style="text-align:right;">
+0.0632888
+</td>
+<td style="text-align:right;">
+0.23166
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

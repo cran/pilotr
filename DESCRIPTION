@@ -1,0 +1,41 @@
+Package: pilotr
+Title: Simulate Experimental and Behavioural Data from a Portable
+        Design Specification
+Version: 0.3.0
+Authors@R: 
+    person("Pablo", "Bernabeu", role = c("aut", "cre"),
+           email = "pcbernabeu@gmail.com",
+           comment = c(ORCID = "0000-0003-1083-2460"))
+Description: Generative simulation of experimental and behavioural data sets from a
+    portable JavaScript Object Notation (JSON) design specification shared with the
+    'Python' package of the same name.
+    Supports user-specified fixed effect sizes, crossed by-subject and by-item random
+    intercepts and slopes, predictors measured with error, realistic response families
+    (Gaussian, lognormal, shifted lognormal, ex-Gaussian, Bernoulli, Poisson, ordinal and
+    Beta), and simulation-based power and precision-based design analysis, including the
+    Type S and Type M errors of Gelman and Carlin (2014)
+    <doi:10.1177/1745691614551642> and a region of practical equivalence. A shared
+    cross-language random-number generator means that, given the same specification and
+    seed, the R and 'Python' implementations produce identical data: exactly for the
+    Gaussian family and for any family with rounding set, and to within the last unit in
+    the last place for families applying a transcendental function to the linear
+    predictor, whose rounding the IEEE-754 standard does not fix.
+License: MIT + file LICENSE
+URL: https://pablobernabeu.github.io/pilotr/r/,
+        https://github.com/pablobernabeu/pilotr
+BugReports: https://github.com/pablobernabeu/pilotr/issues
+Encoding: UTF-8
+Depends: R (>= 4.0.0)
+Imports: jsonlite, parallel, stats
+Suggests: shiny, future, promises, ggplot2 (>= 3.4.0), lme4, lmerTest,
+        callr, knitr, rmarkdown, testthat (>= 3.0.0), MASS
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0
+NeedsCompilation: no
+Packaged: 2026-09-01 09:05:54 UTC; PabloB
+Author: Pablo Bernabeu [aut, cre] (ORCID:
+    <https://orcid.org/0000-0003-1083-2460>)
+Maintainer: Pablo Bernabeu <pcbernabeu@gmail.com>
+Repository: CRAN
+Date/Publication: 2026-09-12 07:30:08 UTC

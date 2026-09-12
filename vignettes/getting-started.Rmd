@@ -1,0 +1,125 @@
+---
+title: "Getting started with pilotr"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with pilotr}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = FALSE, comment = "")
+# Console colour carries no meaning on a rendered page. pkgdown turns it on for
+# its own build, and the escape sequences then reach the reader as literal text,
+# so colour is switched off here for a plain vignette render and a site build
+# alike. The fixed width keeps printed output inside the documentation column.
+options(cli.num_colors = 1, cli.hyperlink = FALSE, crayon.enabled = FALSE,
+        width = 80)
+```
+
+```{r setup}
+library(pilotr)
+```
+
+## One specification, three interfaces
+
+pilotr is built around a portable design specification that fully describes a data-generating
+process and is consumed identically by three interfaces, namely a no-code web application,
+this R package and a Python package. The specification is the unit of reproducibility. It is
+a complete, executable description rather than a screenshot of a graphical interface or a
+language-specific script. You can place it under version control, attach it to a
+preregistration, share it with a collaborator and run it unchanged in R or Python to obtain
+identical data, bit for bit apart from a documented tolerance of a few units in the last place
+where an unrounded response family applies `exp()` or `log()` to the linear predictor (the
+cross-language vignette quantifies this).
+
+This vignette walks through the core loop of describe, simulate, inspect and export. The
+other vignettes, listed at the end, each go deeper into one part of the workflow.
+
+## Describe a design
+
+The specification is a small list serialised to JSON. You can write it by hand, point and
+click in the web application or build it from a flat set of inputs with `build_spec()`. The
+example below is a crossed psycholinguistic design. Subjects respond to items in a related or
+unrelated condition, with reaction time as the outcome, crossed by-subject and by-item random
+intercepts and slopes, and a small priming effect on the log scale.
+
+```{r}
+spec <- build_spec(list(
+  name = "priming", seed = 2024,
+  design_kind = "within", include_items = TRUE,
+  n_subject = 24, n_item = 20,
+  factor_name = "condition", lev1 = "related", lev2 = "unrelated",
+  intercept = 6.0, effect = 0.05,
+  subj_int_sd = 0.12, subj_slope_sd = 0.04, subj_corr = 0.2,
+  item_int_sd = 0.08, item_slope_sd = 0.02, item_corr = -0.1,
+  family = "shifted_lognormal", resp_name = "RT", sigma = 0.30, shift = 200
+))
+```
+
+The portable artefact is plain JSON. This is exactly what the web application downloads and
+what the Python package reads.
+
+```{r}
+cat(spec_json(spec))
+```
+
+You can read a specification back from a file (or string) with `load_spec()`, so a design
+authored anywhere runs everywhere. The full specification format, including every field and the
+cross-language RNG draw order, is documented in
+[`spec/SPEC.md`](https://github.com/pablobernabeu/pilotr/blob/main/spec/SPEC.md).
+
+## Simulate
+
+`simulate_design()` turns a specification, supplied either as a list or as a path to a JSON
+file, into an analysis-ready data frame.
+
+```{r}
+data <- simulate_design(spec)
+nrow(data)
+head(data)
+```
+
+The design is crossed, so every subject sees every item in both conditions
+(`r 24 * 20 * 2` rows here).
+
+## Reproducible by construction
+
+pilotr ships a shared random-number generator, so the same specification and seed produce the
+same data every time. This holds in the current R session, in a fresh one, in Python and on
+any machine.
+
+```{r}
+isTRUE(all.equal(simulate_design(spec), simulate_design(spec)))
+```
+
+Changing the seed changes the data, and leaving the specification unchanged leaves the data
+unchanged. The [cross-language vignette](cross-language.html) describes how this holds across
+R and Python.
+
+## Export a self-contained script
+
+`generate_r_script()` emits a stand-alone R script that embeds the specification and
+reproduces the design with no external files. This is convenient for an appendix or a
+preregistration.
+
+```{r}
+cat(generate_r_script(spec))
+```
+
+## Where to go next
+
+The remaining guides pick up where this one leaves off, taking the same specification through
+each response family, through power and precision analysis and out to the other interfaces
+that read it.
+
+- [Response families](response-families.html), covering Gaussian, reaction-time, accuracy,
+  count, ordinal and proportion outcomes.
+- [Power and design analysis](power-analysis.html), covering simulation-based power with Type
+  S and Type M errors, for two-group and crossed mixed-effects designs.
+- [Precision / ROPE design analysis](precision-rope.html), which plans by precision against a
+  region of practical equivalence and sweeps sample size.
+- [Cross-language reproducibility](cross-language.html), describing the shared generator that
+  makes R and Python agree to the last bit.
+- [The no-code app](the-no-code-app.html), the point-and-click interface over the same
+  specification, running in the browser or locally with `run_app()`.

@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Response families</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Response families</h1>
+
+
+
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(pilotr)</span></code></pre></div>
+<p>Behavioural outcomes are seldom Gaussian. pilotr maps the linear
+predictor <span class="math inline">\(\eta = \beta_0 + \sum_k \beta_k
+x_k + (\text{random effects})\)</span> to an outcome through one of
+eight response families. An important consequence is that the fixed
+intercept and effect live on the family’s own scale. That scale is the
+identity for the Gaussian and ex-Gaussian families, the log scale for
+lognormal reaction times, reading times and counts, and the logit scale
+for accuracy, ordinal and proportion outcomes. This vignette presents
+each family with scale-appropriate parameters.</p>
+<p>The helper below builds a two-group between-subjects design and
+reports the group means.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>demo <span class="ot">&lt;-</span> <span class="cf">function</span>(family, intercept, effect, <span class="at">n =</span> <span class="dv">4000</span>, ...) {</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>  spec <span class="ot">&lt;-</span> <span class="fu">build_spec</span>(<span class="fu">list</span>(</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>    <span class="at">name =</span> family, <span class="at">seed =</span> <span class="dv">1</span>, <span class="at">design_kind =</span> <span class="st">&quot;between&quot;</span>, <span class="at">n_subject =</span> n,</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>    <span class="at">factor_name =</span> <span class="st">&quot;group&quot;</span>, <span class="at">lev1 =</span> <span class="st">&quot;control&quot;</span>, <span class="at">lev2 =</span> <span class="st">&quot;treatment&quot;</span>,</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>    <span class="at">intercept =</span> intercept, <span class="at">effect =</span> effect, <span class="at">family =</span> family,</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>    <span class="at">resp_name =</span> <span class="st">&quot;&quot;</span>, ...))</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>  d <span class="ot">&lt;-</span> <span class="fu">simulate_design</span>(spec)</span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>  y <span class="ot">&lt;-</span> d[[spec<span class="sc">$</span>response<span class="sc">$</span>name]]</span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">spec =</span> spec, <span class="at">data =</span> d, <span class="at">y =</span> y, <span class="at">by_group =</span> <span class="fu">tapply</span>(y, d<span class="sc">$</span>group, mean))</span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a>}</span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a>fam_hist <span class="ot">&lt;-</span> <span class="cf">function</span>(y, fill, title, xlab) {</span>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">data.frame</span>(<span class="at">y =</span> y), <span class="fu">aes</span>(y)) <span class="sc">+</span></span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a>    <span class="fu">geom_histogram</span>(<span class="at">bins =</span> <span class="dv">40</span>, <span class="at">fill =</span> fill, <span class="at">colour =</span> <span class="cn">NA</span>) <span class="sc">+</span></span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a>    <span class="fu">labs</span>(<span class="at">title =</span> title, <span class="at">x =</span> xlab, <span class="at">y =</span> <span class="st">&quot;count&quot;</span>) <span class="sc">+</span></span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a>    <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">12</span>) <span class="sc">+</span></span>
+<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a>    <span class="co"># theme_minimal still paints a white plot.background over the transparent</span></span>
+<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a>    <span class="co"># device canvas, so both surfaces have to be cleared for the page colour to</span></span>
+<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a>    <span class="co"># reach the figure. The ink stays at its default, because the website</span></span>
+<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a>    <span class="co"># inverts the figure in dark mode, which turns the dark axis text light of</span></span>
+<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a>    <span class="co"># its own accord.</span></span>
+<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a>    <span class="fu">theme</span>(<span class="at">plot.background  =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">colour =</span> <span class="cn">NA</span>),</span>
+<span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a>          <span class="at">panel.background =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">colour =</span> <span class="cn">NA</span>),</span>
+<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a>          <span class="at">panel.grid       =</span> <span class="fu">element_line</span>(<span class="at">colour =</span> <span class="st">&quot;grey80&quot;</span>))</span>
+<span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a>}</span></code></pre></div>
+<div id="gaussian" class="section level2">
+<h2>Gaussian</h2>
+<p>This is the default, with <span class="math inline">\(y = \eta +
+\varepsilon\)</span> and residual standard deviation <code>sigma</code>.
+It suits continuous, roughly symmetric outcomes such as ratings averaged
+over many trials or standardised scores.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>g <span class="ot">&lt;-</span> <span class="fu">demo</span>(<span class="st">&quot;gaussian&quot;</span>, <span class="at">intercept =</span> <span class="dv">100</span>, <span class="at">effect =</span> <span class="dv">5</span>, <span class="at">sigma =</span> <span class="dv">10</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">round</span>(g<span class="sc">$</span>by_group, <span class="dv">2</span>)</span></code></pre></div>
+<pre><code>  control treatment 
+    97.50    102.41 </code></pre>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">fam_hist</span>(g<span class="sc">$</span>y, <span class="st">&quot;#2C6FB0&quot;</span>, <span class="st">&quot;Gaussian&quot;</span>, <span class="st">&quot;score&quot;</span>)</span></code></pre></div>
+<p><img role="img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAkAAAAFGCAMAAAC19dCEAAAA8FBMVEX9/v0AAAAAADkAAGUAOTkAOWUAOY8AZrUsb7A5AAA5ADk5OQA5OWU5ZmU5Zo85j9pNTU1NTW5NTY1NbqpNjcdlAABlADllOQBlj7Vlj9pltdpltf1uTU1uTW5uTY1ujY1uq+KNTU2NTW6NyP2POQCPZjmPZmWPZo+Pj2WP29qP2/2qbk2q4/21ZgC1Zjm1j2W1tbW1tdq129q12/21/v3HjU3H/v3MzMzajznaj2XatWXatY/a24/a27Xa29ra2/3a/tra/v3iq27iyMfi/v39tWX9yI3924/927X929r946r9/rX9/sf9/tr9/uL9/v2GtT5yAAAAUHRSTlP/////////////////////////////////////////////////////////////////////////////////////////////////////////ABNzpnkAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAyOSURBVHic7ZwLe9TGFUAjQ3DctOwG2JjihMTY6cPYNG2AuE1pi4Mx8drs//831eixD2m1jOaOdGe053xgCVm6e/few2iklf3ZDEDAZ9oJQNwgEIhAIBCBQCACgUAEAoEIBAIRCAQiRAK9+WEvSe4+ftvikNvje212h9ARCHT7IsnZOWlxEAINC4FAZ8ndJ6kMv71I7rz0lxDEhbtAV3ufF96cJweesoHocBdooc30z39Nv/7ry/Rkls6H8pNU9vX2RTpH+v1Ps9liLf/u0r7/3k92/ujjnYAKzgJVJzPn+XxotCzQ2XyKNF/Lti/tW65BpDgLNJ3srv7zTjq+XE3uvV0INJ1ko02qx2It377YN9k1Pu02vQqEjlSg6cSMINlg9J8f//RlsirQzv0f/5vvVa4VA9d8XzP/zvWCKJGewuYCXe0l+drSKSw7VZm5zmIt275uX4gT90n02fz2Tz7aJH94/Pc3k1Up3vxQjk/lWvO+ECWSy/iy7UaAy+yabDqpnZZ++2W/MC1bq+6LQJEjupG48zid19z+sp8YKdLZ8Aezlm7PLq/uvb3a202//+F452SxlgtU7otA0SP5LKz8KCP5/KdiLpSYm9KX2ab9+WW8ucaarxWnsGJfBIoe0YepH8yHqTv3/5Gt7yfJ3SfZxOif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" /><!-- --></p>
+</div>
+<div id="shifted-lognormal-reaction-times" class="section level2">
+<h2>Shifted lognormal (reaction times)</h2>
+<p>Reaction times are right-skewed and bounded below. pilotr models them
+as <span class="math inline">\(y = \text{shift} + \exp(\eta +
+\varepsilon)\)</span>, with the effect on the log scale. An intercept of
+6 implies a typical RT near <code>exp(6)</code> ms above the shift.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>rt <span class="ot">&lt;-</span> <span class="fu">demo</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="st">&quot;shifted_lognormal&quot;</span>, <span class="at">intercept =</span> <span class="dv">6</span>, <span class="at">effect =</span> <span class="fl">0.1</span>, <span class="at">sigma =</span> <span class="fl">0.3</span>, <span class="at">shift =</span> <span class="dv">200</span></span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>)</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="fu">round</span>(rt<span class="sc">$</span>by_group, <span class="dv">1</span>)</span></code></pre></div>
+<pre><code>  control treatment 
+    600.6     642.6 </code></pre>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">fam_hist</span>(rt<span class="sc">$</span>y, <span class="st">&quot;#B0402C&quot;</span>, <span class="st">&quot;Shifted lognormal (RT)&quot;</span>, <span class="st">&quot;RT (ms)&quot;</span>)</span></code></pre></div>
+<p><img role="img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAkAAAAFGCAMAAAC19dCEAAABFFBMVEX9/v0AAAAAADkAAGUAOTkAOWUAOY8AZo8AZrU5AAA5ADk5AGU5OQA5OWU5ZmU5Zo85ZrU5j7U5j9pNTU1NTW5NTY1NbqpNjcdlAABlADllOQBlOTllj7Vlj9pltbVltdpltf1uTU1uTW5uTY1ubk1ubqpujY1uq+KNTU2NTW6NTY2NyP2POQCPZgCPZjmPZmWPj2WPtY+PtdqP2/2qbk2qbm6q4/2wQCy1ZgC1Zjm1jzm1j2W1tbW1tdq12/21/v3HjU3H/v3MzMzajznaj2XatWXatY/atbXa24/a27Xa29ra2/3a/tra/v3iq27iyMfi/v39tWX9yI3924/927X929r946r9/rX9/sf9/tr9/uL9/v0rLnNHAAAAXHRSTlP/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////AINtF+AAAAAJcEhZcwAADsMAAA7DAcdvqGQAAA/XSURBVHic7Z0Le9u2FYZLO/GsbmszK0vc2+oma+vMWrbVmafukjhV27VbrVpWpkv4///HCBKUSJvi5ZwDggS+98ljKaI/AQd8A4IU7bwTAsDgHdsdAP0GAgEWEAiwgECABQQCLCAQYAGBAAsIBFhwBPr+oyAIfv1V9Gw9OrhKXkueLT8MgpPwf0Wh+eAw+51iZN9u+cF5OAsS7n0cvZz+JVDdGh8JNus9DIG+1rvkwV2BxkGwd/7tL18VpNoQaHyYdebwlkDzd88F2/UdukDzwZ6afH74MNont2RYj/Yjd8b7lgSa7Z0rZ07iv3w/2Du/9Q3jQ8F2fYcu0ETvIWXEHYHiaciWQLEgqUCbJ9tvmO1hChKDLtBmD4XxzvlpFOx9kuym+IDxi1Fy9HjzPDqcfRzvujfRmunBD3mB3jwfBMH7L+PN0cLp/p8HR2pLNK+pd8tsX48OJ8H+y/HBT8/VpnX0tg/Uu373q+T9t37MBydhqUDLY0xBYtAFWo+C97/arHzuf6isOboj0HyQrkP003s5gfRmNVfpp/F7pM8y29eje4Pg4Gp88Ef1wqcj/Q2TbSj1YxJPMCWHsB1zI6DAWESrSWBzFhYcvAy/DfTBLHMIGwe/if7+dbxOUk+/HwRZgcZqGok2H243xwIdXkVqHIb57ersaawair4r+vpd5NPyeD+anebHB1eZJU6sx3bd/CDTXsIExzAxWNeB1v/+U3QAiY1Ru2SZ7setQHrFEx1/0qezrEAqESaL7s3mI70GV9sy25MXw7FqKHmujfjPP6NOZATSTzan8Z+GYfb1pJHt0RfwYF9IXP89nXfir3cE0vvx4Go+iK+/bBYg6pv0a2pK0Dt1PjjKvFtmu97/46062WNgkUDR+70ZJSupzOthCIEkIQukJ4d0eqgSSE0xBgRaHgfvffyvH493CJQe+DKvhyEEkoQ+A403i9NSgTaXfZscwrZ+ZA5hRQIlKix3ChRtStc7EMgInNP4+Oz8zWjnISzaddHi6JPo6XeDQ72erreI3hyhstuLBYqW29H5f9Ei+kR3My+WAotoORhrIH0GHdx/VSzQJHMar/ZY8vS9otP47eYgL9B2+85DmD5C7jqNjxw82ranXxK9hOk3nEX0jx8N9IeVhQIt1cQQX0hMrxQ+L7qQGOnx4L/xZnUh8S+5NVBm+45FtArd+3S8WSOFoT5sbgRKD2LZC4n4OFWMrt3OkVk0kamaYPBRhiCdEWh5fP+lmoUEdm6VIPgwVZDOCKRuAUk/9GC/Vemb4HYOSboj0Pofg8x1YxbqhrLd4IYySbojEOglEAiwgECABQQCLCAQYAGBAAsIBFi0JdA3rQeRbCUJgZBkJSEQkqwkBEKSlYRASLKSEAhJVhICIclKQiAkWUmyQN8Ar2EL1NS31oNItpKEQEiyki4I9LcMEk0i2SDZK4F2mAKBLCYhUEWbSJYnIVBFm0iWJyFQRZtIlichUEWbSJYneyvQDiSaRLJBEgJJdtbDJASS7KyHSQgk2VkPkxBIsrMeJiGQZGc9TEIgyc56mIRAkp31MAmBJDvrYRICSXbWwyQEkuysh0kIJNlZD5MQSLKzHiYhkGRnPUxCIMnOepiEQJKd9TAJgSQ762ESAkl21sMkBJLsrIfJUoFuhsOHF2H49sXwt683D9wWGcEaAu2QqaXOepgsE2jx5CK8iZy5fKz+pA/cFhlBCNS9ZNUhbPXsIvoTLp6+1g/sFhvSUBoI1HKySqDpo2tlTWSPfmC32BAI1O1kuUCLzx4m085dgdr6PTQMgdrqopfUEyhUa6DezkDkyaivs4GNZI01EARCcnfS5UU0BGohWSaQOoVffH5t9zQeAnU7WToDTYfxpcPVafaB22JDIFC3k53/KAMCdTsJgSQ762ESAkl21sMkBJLsrIdJCCTZWQ+TEEiysx4mIZBkZz1MQiDJznqYhECSnfUwCYEkO+thEgJJdtbDJASS7KyHSQgk2VkPkxBIsrMeJiGQZGc9TEIgyc56mIRAkp31MAmBJDvrYRICSXbWwyQEkuysh0kIJNlZD5MQSLKzHiYhkGRnPUxCIMnOepiEQJKd9TAJgSQ762GSLFBbv4dGRqC2eusPbIGa+kYNygjUUmc9TEIgyc56mOymQDLWQKAWkhCI3Vm/kxCI3Vm/k54I1Eymvu5MG0kIxO6s30kIxO6s30kIxO6s30kIxO6s30kIxO6s30kIxO6s30kIxO6s30kIxO6s30kPBap2qa8700YSArE763cSArE763cSArE763cSArE763cSArE763cSArE763cSArE763cSArE763cSArE763cSArE763cSArE763cSArE763eyVKDFZ8PhWRi+fRH/f9/6gdtiHSBQb5JlAq1Oz8Kbhxfh5WP1J33gtlgHCNSbZFag5Qfn8eNs/1X8ePPoOpp2zlbPLsLF09f6gd1iHSBQb5JFAk20QIpoFlLWRPboB3aLdYBAvUluBRoHG4623zl9dF0skNFfPtOWQEaLcJu7Am1noAzTaNmMGchUmS4ky0/jp9ESGgIZK9OFZE6g9Sg5hKVroGl82o5FtKkyXUjmBBpnVs8RiyfJfIPTeENlupDMrYGOj3LfdTlUnEVnYvEVRP3AbbEOEKg3ybxAJ+R3rN9iHSBQb5JZgdajQ/I71m+xDhCoN8ncGmgWGJuCIJCjyfwhLMifhQkCgRxN4nYOdmf9TkIgdmf9TuIQVtRmS2W6kCyYgWYG/IFAriaLDmFjA2fzEMjRZJFAJqYgCORoskigiRWB2pIGAokmCwRaHls5hEGgXiaLzsIOrshvXKPFXUCgXia7cx0IAvUy6bdAuzBYpmvJvEDzQXQE27tzZ7QAEMjR5K1P49UdZRMTn8lDIEeT+fuBkjsSJwZW0RDI0WTRHYl2LiTaliaLwTJdS2IGKsJgma4lsQYqwmCZriVxFlaEwTJdS+I6UBEGy3QtCYGKMFima8m8QONo+TwLjm5/uwAQyNFk/keb49Ovep/Gi/++ENvSZBEvzj2KBMJ1oBSDZbqWLLwOBIHMlelaMncIS64AzQcGFkEQyNEkrgMVYbBM15I4jS/CYJmuJSFQEQbLdC0JgYowWKZrSQhUhMEyXUtCoCIMlulaEgIVYbBM15IQqAiDZbqWhEBFGCzTtSQEKsJgma4lIVARBst0LQmBKpAu07UkBKpAukzXkhCoAukyXUtCoAqky3QtCYEqkC7TtaRdgWzbUQOJMl1OQqAKJMp0OQmBKpAo0+UkBKpAokyXkxCoAokyXU5CoAokynQ5CYEqkCjT5SQEqkCiTJeTEKgCiTJdTlYItHj6Ogzfvoj/v2/9wG0xi207aiBRpsvJcoFWp0qZy8fqT/rAbTGLbTtqIFGmy8lSgabDL6IZaPXsQs1E+oHdYhbbdtRAokyXk6UC/XytjFkkEumHzVtIYNuOGojU6SC1BErWQMUCkZXNYtuOGkiU6XISAlUgUabLSQhUgUSZLidrCIRFNLdMl5N1rgN5fRqfhVomfYC6n6wj0Oo0voKoH7gtZrFtREOoZdIHqPtJfJTRAGqZ9AHqfhICNYBaJn2Aup+EQA2glkkfoO4nIRCRJmXSB6j7SQhEpEmZ9AHqfhICEWlSJn2Aup+EQESalEkfoO4nLQhke9fLUFkmfYB6lYRARCrLpA9Qr5IQiEhlmfQB6lUSAhGpLJM+QL1KQiAilWXSB6hXSQhEpLJM+gD1KgmBiFSWSR+gXiUhEJHKMukD1KskBCJSWSZ9gHqVhEBEKsukD1CvkhCIT3GZ9AHqVRIC8Skukz5AvUpCID7FZdIHqFdJCCSLxAD1KgmBZJEYoF4lIZAsEgPUqyQEkkVigHqVhECySAxQr5Jkgei/Wcb2Pm4Lud/F00XYAjX1bfvU9o5tC/IA0YfWQhICGYM8QPShtZCEQMYgDxB9aC0kIZAxyANEH1oLSQhkDPIA0YfWQhICGYM8QPShtZCEQMYgDxB9aC0kIZAxyANEH1oLSQhkDPIA0YfWQhICGYM8QPShtZCEQMYgDxB9aC0kIZAxyANEH1oLSQhkDPIA0YfWQhICGYM8QPShtZCEQMYgDxB9aC0kIZAxsuXver1wgOhDayEJgVqncoDoQ2sh2ZJAtndaRyncJU2BQP5SuEuaAoGAgjy2EAgoyGMLgYCCPLYQCCjIYwuBgII8thAIKMhjC4GAgjy27gpke5f0lx2DWLUzmwKBPKNqZzalZYHevmj4337bHm/nqNqZTWlZoMvH6k8DbI+3c1TtzPyYV++gdgVaPbsIF0+rpiBrg+sDOwa6xvhXabB7L1Yl6wuk5FESpW8BvIYtUEPIs2VfP6X2JQmBkGQlIRCSrKT0Irq6xbaCSLaSNHkaX9xiW0EkW0k2EGh12vBCYnGLbQWRbCVp4acyWgoi2UoSAiHJSkIgJFlJCIQkK9mWQMBRIBBgAYEACwgEWEAgwAICARYQCLCAQIAFBAIsIBBg0VGBFp8Nh4+u0x9Fa/wTaRRuhoovbzVtlvgGvXyRxtuN21RFnt0eZhIdFegmuXNN38PGupWtUbPROOabNsrqVO23fJGm243bXJ2ehTcPLyRq7ahAl1+qr/ouWt7NtA1Q45pv2mhz0+EX+j7zbZGm203avImnnTOJWrsp0Nu/xjfv6/v4ebfzN2CqxjXXtNHmfr5WreSLNN1u0qYi+tciUWs3BVo9+/3w4UXbAql/k7eaNtxi+wKFm7km+tciUWs3BVo8uQhXf3jdskDJ8jLXdAstWhJoGi2FJGrtpkCKNgc1YZouJFtr055A04e6DW6bnRao5UV0sqTMNW24xXTXtbeI1gJNN6ft3Fq7KZA6nV58ft3uaXy8BLrdtFni3dbuaXwy6z2J5xuJWrspUHS2GV/a0j+KxvqJtNroWTzftFligfJFGm9XtXkZXzQ9k6i1owKBvgCBAAsIBFhAIMACAgEWEAiwgECABQQCLCBQCetREHMULo+TZ8H+K73lpDCx/OC8zQ52AAhUwnp0qB5mQWzL/N2tHJPDHZHZwZX5fnUJCFSCFkg/ZARaHhdPQLunJmeBQCVoc8JxPK1kBJpFR7L54HfRce1oPgjUBKUe4olq4tkUBIFK2DkDjQ+VMnvn4UQtiib7r+aDE32om+35tQqCQCVocya310DL4yMl0PbLyUwvruO/2OiqNSBQCelZWKJEVqATbUr6ZXmcGhTL5REQqIR4BpoP9BnXVqCcO8mX2DUlGgQCG5JD2CxIlCibgeKXx2r5A4HABr0GGifr4jtroNsCbb3yCAhUghZoeXz7ND45C8sIFJ97bb94BAQqIb0ONIkPYneuA2VnoFm0BIrVwXUgUM3uK9G7tzgKBCKBz8JSIBAJfBqfAoEACwgEWEAgwAICARYQCLCAQIAFBAIs/g9kfW6OheUAFgAAAABJRU5ErkJggg==" /><!-- --></p>
+</div>
+<div id="lognormal-positive-continuous" class="section level2">
+<h2>Lognormal (positive continuous)</h2>
+<p>The plain <code>lognormal</code> family is the shifted lognormal
+without the shift, <span class="math inline">\(y = \exp(\eta +
+\varepsilon)\)</span>, suited to positive continuous outcomes such as
+per-word reading times. As with reaction times the effect is on the log
+scale.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>ln <span class="ot">&lt;-</span> <span class="fu">demo</span>(<span class="st">&quot;lognormal&quot;</span>, <span class="at">intercept =</span> <span class="dv">6</span>, <span class="at">effect =</span> <span class="fl">0.1</span>, <span class="at">sigma =</span> <span class="fl">0.3</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">round</span>(ln<span class="sc">$</span>by_group, <span class="dv">1</span>)</span></code></pre></div>
+<pre><code>  control treatment 
+    400.6     442.6 </code></pre>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">fam_hist</span>(ln<span class="sc">$</span>y, <span class="st">&quot;#7A4FB0&quot;</span>, <span class="st">&quot;Lognormal&quot;</span>, <span class="st">&quot;reading time (ms)&quot;</span>)</span></code></pre></div>
+<p><img role="img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAkAAAAFGCAMAAAC19dCEAAAA/FBMVEX9/v0AAAAAADkAAGUAOTkAOWUAOY8AZrU5AAA5OQA5ZmU5Zo85ZrU5j7U5j9pNTU1NTW5NTY1NbqpNjcdlAABlADllOQBlj7Vlj9pltbVltdpltf1uTU1uTW5uTY1ubqpujY1uq8duq+J6T7CNTU2NTW6NyP2POQCPZgCPZjmPZmWPj2WPtY+P2/2qbk2q4/21ZgC1Zjm1j2W1tWW1tbW1tdq124+12/21/v3HjU3Hq27H/v3MzMzajznatWXatY/a24/a27Xa29ra2/3a/rXa/tra/v3iq27iyMfi/v39tWX9yI3924/927X946r9/rX9/sf9/tr9/uL9/v2rriOQAAAAVHRSTlP//////////////////////////////////////////////////////////////////////////////////////////////////////////////wBT93LRAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAPVUlEQVR4nO2dDVsbxxWFs5CA0qaIYjlpg+O0Loa6Lkb9tKmt9BuKIBJ4//9/6c5+SLt4BTszd+4crc77OMiW4PjMnderXSE7n6WEePBZ7AJkvaFAxAsKRLygQMQLCkS8oEDECwpEvKBAxAt3gabJoWCPkruTnQv5VBIOCkS8oEDECwpEvJAR6MdXgyT56dv8p18nyRevB3vGhX98nWz9ovH43cnuJNl+O9757yvz0N2rJPnKGPPDl0my9c0FBVo7RAS6yfTI2H63+GliBKp+Vnv87uTzQbJzMd75rbnj25PyEybLL6JA64WIQGNzGLn7Q7JrrPnZRfr3QSHQ7kWmxu69x/fyL9h5az4r+/hD5tN8tJ0dnW5GOxcUaN2QEGg+ynf97mT73c1gt3hsL/9l8Vjt8eLOdLx1mpafUCrzrz//7suEAq0fEgLdDPby28nWaXnnzaB6NjIfa4+XgoyX6uQfy+c4CrR+QAg0HyU/+eYv/+RT2BoS8ils6UftKaxNoCJqToHWkJAn0YtnqPrj7QJlp9vZ9T8FWj98BCo5rE5hzJlx/TL+/ilO9vjKp7DyOp8CrRsiAqU/vsr0+Orf5u78hcTfN86Bao+vOIk2X/T5t+PFORJZG8K8naM6bSa9R1ig+eiLt+YoZJ7NyCYgfQQaF09ru8KxBBVpge7+ODCnM8KpBBa+pZV4QYGIFxSIeEGBiBcUiHhBgYgXFIh4EVKgDzAhSCk9q0KBtFN6VoUCaaf0rAoF0k7pWRUKpJ3SsyoUSDulZ1UokHZKz6pQIO2UnlVxFugD2Wi8BeriGEwIUkrPqlAg7ZSeVemDQL+pEbIKzq4BVVkrgVaYQoEihlAgxy5xQ3CqUCDHLnFDcKpQIMcucUNwqlAgxy5xQ3CqrK1AKwhZBWfXgKpQIMcucUNwqlAgxy5xQ3CqUCDHLnFDcKpQIMcucUNwqlAgxy5xQ3CqUCDHLnFDcKpQIMcucUNwqlAgxy5xQ3CqUCDHLnFDcKpQIMcucUNwqlAgxy5xQ3CqUCDHLnFDcKpQIMcucUNwqlAgxy5xQ3CqUCDHLnFDcKpQIMcucUNwqlAgxy5xQ3CqUCDHLnFDcKo8KND1cLh/lqYf3wx//n5x050YAq2QqWe7BlTlIYFm352l15kz50/Mj+qmOxQoWAhOlceewm5fnmU/0tnz9+WNRbbIIi2loUDKIY8JdHlwZazJ7ClvLLIpULAQnCoPCzR7tl8cdj4VSOvfofEQSKviRtJNoNScA63tEajukkQVnD/2QFU6nANRoAqYXQOq0ueTaAqkEPKQQOYSfvb9VdzLeAoULiX4EehymL90eHtUv+kOBQoWglMF/lsZFChcCgWiQNFDKJAFMLsGVIUCWQCza0BVKJAFMLsGVIUCWQCza0BVKJAFMLsGVIUCWQCza0BVKJAFMLsGVIUCWQCza0BVKJAFMLsGVIUCWQCza0BVKJAFMLsGVIUCWQCza0BVKJAFMLsGVIUCWQCza0BVKJAFMLsGVIUCWQCza0BVKJAFMLsGVIUCWQCza0BVKJAFMLsGVIUCWQCza0BVKJAFMLsGVIUCWQCza0BVKJAFMLsGVIUCWQCza0BVnAXS+ndohAQiwngL1MUxiRAhgSSq4PyxB6pCgSyA2TWgKpgCyVhDgRRCKJDKgqRDcKpQIJUFSYfgVNkQgerEWJB0CE4VCqSyIOkQnCoUSGVB0iE4VSiQyoKkQ3CqUCCVBUmH4FShQCoLkg7BqUKBVBYkHYJThQKpLEg6BKcKBVJZkHQITpUNFMjdJZhdA6pCgVQWJB2CU4UCqSxIOgSnCgVSWZB0CE4VCqSyIOkQnCoUSGVB0iE4VSiQyoKkQ3CqUCCVBUmH4FShQCoLkg7BqUKBVBYkHYJThQKpLEg6BKcKBVJZkHQIThUKpLIg6RCcKg8KNHs2HB6n6cc3+f/vu7zpDgUKFoJT5SGBbo+O0+v9s/T8iflR3XSHAgULwalSF2j+9DS/nW6/y2+vD66yw87x7cuzdPb8fXmj0o8CqaSEEmhSCmTIjkLGmsye8kalHwVSSZEVaJws2Fs+fnlw1S5Q0H98RkugoIvoN58KtDwC1bjMTpt5BPJfkHQITpWHL+Mvs1NoCiSwIOkQnCoNge5Oiqew6hzoMr9s50m0/4KkQ3CqNAQa186eM2bfFccbXsZ7L0g6BKdK4xxotNd47HxoOM6uxPJXEMsbjX4USCVFXqBDgcQlFChYCE6VukB3J7sCiUsoULAQnCqNc6BpInoIokDBQnCqNJ/CkuZVmCcUKFgIThW+nUNlQdIhOFUokMqCpENwqvAprO33FF+QdAhOlZYj0FTIHwoULgSnSttT2Fjoap4CBQvBqdImkNQhiAIFC8Gp0ibQJIpAWtJQINGQFoHmoyhPYRRIPSXUVdjOhUBwSoEChuBUwXkdiAKpp1CgUIgsKGQITpWmQDeD7Bls65N3RjtCgYKF4FS59914846yidT35ClQsBCcKs33AxXvSJwInUVToGAhOFXa3pEY54XE2NLUEVlQyBCcKjwCtSGyoJAhOFV4DtSGyIJChuBU4VVYGyILChmCU4WvA7UhsqCQIThVKFAbIgsKGYJTpSnQODt9niZ7Kz7XFgoULASnSvOvNueXX92+Gy/+74XElqaO+OL6R5tAfB2oQmRBIUNwqrS+DkSBJBYUMgSnSuMprHgF6GYgdBJEgYKF4FTh60BtiCwoZAhOFV7GtyGyoJAhOFUoUBsiCwoZglOFArUhsqCQIThVKFAbIgsKGYJThQK1IbKgkCE4VShQGyILChmCU4UCtSGyoJAhOFUoUBsiCwoZglOFArUhsqCQIThVKFAbIgsKGYJThQI9gvuCRKYSNIUCKeC+IJGpBE2hQAq4L0hkKkFTKJAC7gsSmUrQFAqkgPuCRKYSNGX9BYptRwfsFiQyFbUUCqSA3YJEpqKWQoEUsFuQyFTUUiiQAnYLEpmKWgoFUsBuQSJTUUuhQArYLUhkKmopFEgBuwWJTEUthQIpYLcgkamopVAgBewWJDIVtRQFgWbP36fpxzf5/++7vOkOBXKbilpKeIFuj4wy50/Mj+qmOxTIbSpqKcEFuhz+KjsC3b48M0ei8sYimwK5TUUtJbhA/7syxswKicqbxW8uQWw7OiCyzh7SSaDiHKhdoA7wCOQ2FbUUpZNoCtR9QSJTUUuhQArYLUhkKmopSgLxJLr7gkSmopai9TrQRl/G14HZtTUT6PYofwWxvOkOBXKbiloKv5WhDMyuUaCS2EZYArNrFKgkthGWwOwaBSqJbYQHAaeilkKBIhJwKmopFCgiAaeilkKBIhJwKmopaypQ7K2XQXoqMVIoUESkpxIjhQJFRHoqMVIoUESkpxIjhQJFRHoqMVIoUESkpxIjhQJFRHoqMVIoUESkpxIjhQJFRHoqMVIoUESkpxIjhQJhIDIVSyhQjxCZiiUUqEeITMUSCtRTnKciM1v9EAoki/NUZGarH0KBZHGeisxs9UMokCzOU5GZrX4IBZLFeSoys9UPcRbI/V+Wib3HWsj9WzyIeAvUxbH2u2NvrBZ2U5GZrX4IBQqG3VRkZqsfQoGCYTcVmdnqh1CgYNhNRWa2+iEUKBh2U5GZrX4IBQqG3VRkZqsfQoGCYTcVmdnqh1CgYNhNRWa2+iEUKBh2U5GZrX4IBQqG3VRkZqsfQoGCYTcVmdnqh1CgYNhNRWa2+iEUKBh2U5GZrX4IBQqG3VRkZqsfQoGCYTcVmdnqh1CgYKxac8jZ6odQIHVCzlY/REmg2JsGishs44ZQoJiIzDZuCAVCwXm2IhvkDAVCwXm2IhvkDAVCwXm2IhvkDAVCwXm2IhvkDAVCwXm2IhvkDAVCwXm2IhvkDAVCwXm2IhvkTEiBYm/J+rJiiLW7KRCxpzbbdRTo4xvL/+137Hn3jtps11Gg8yfmhwWx5907arNdtfftn70CXYFuX56ls+ePHYKiDXcTqM35Q/vdq+bfvlkrBXr0K5d0F8jIYySqfnOy0XgL1AGY52molJ5VoUDaKT2rQoG0U3pWRfokug7MIqFSelYl5GU8zCKhUnpWxUKg2yPLFxJhFgmV0rMqEf5WRoQQpJSeVaFA2ik9q0KBtFN6VoUCaaf0rEpIgcgGQIGIFxSIeEGBiBcUiHhBgYgXFIh4QYGIFxSIeEGBiBegAl0Ph/tni7+KZv030kTJfvfhC4wus2fDgyuMKhWYAs2+O0uvs+GU72GzfiubKOcHV6YPQJfboxfp5bJD3LGUYApkuH15Vr6L1v7NtMI9qpvYXcq3pSNUWYAr0GX2B78YmP3b+SUp9wihS7ND3LFUoAo0e7Z/BrFp6fXB34bDY4gut0fH6eXwGKHKAlSBUnMOBDGp6+wM+nof4499dhL96zcUqBsox+rr7LrnI86uoYylAlogiLNF8ztnAkF0KeqgVMnBFMhcws++v8K4Xj1/gfKSglGm1oGX8au5HOavkZV/Fc36b6SJYl5IPMbocj3MX0hEqFIBKhBZFygQ8YICES8oEPGCAhEvKBDxggIRLygQ8YICrWC6dTofHa568DBd/WDB3Un74/Onp57NsKBAK8gEWvnYY/IYJrurgncuHCtBQoFW4CnQ6k9ZdWhaUzZZoPnT18n2u3SSJMme+fU4+0m+udk9W6+Lp7D56Jej4t5xcWf2s5tBkuz8J3vwZmAe3DO/Piy+rAjKmGbBzYfNTfFpvToEbbRAI7OVk0yKm0G28ePd4hfpONv8aVIJlN1j7q3uLL6wOAe6GZgHcwnNf1WQwYQ1Hr4ZZPJMjUEPHdvWj80WaK/8YA4Y+dmt2eZ8q9NxJdBefu/izuILK4HyB4vPWAQtohsPlw+kaZnfFzZboMXxoNzUqXmSKbZ6Wgl0mH/i4s7qCwuBDtPFh0ZQ/mWNh+ejyqDCtL5AgZKCQ3MKs/3XbLsnbQJNHhdoEZTec6f4cHdSPkiB+kLtCJTWdtrrCFSPvmdRWj4FUqC+UMlR/CpXxJzlFrs9aQq0uLP6wk8Ealy4V6dO9wRaetUbNl6g8sJr69Ts63xkrsPNPcursFKy5lXY3qcCLYLy7OIq7P4BavmhN1Cg/OUbc/Qxr/6c5gI0XgeqjlLj7LP+VJ4Ij6vXgRqHmCrIULwOVH/YnCPl6vB1oM1leS3+GKtfie7yfZA1ggJ1Iz+Q2Jz+8nthpMF0cYneDX43npAOUCDiBQUiXlAg4gUFIl5QIOIFBSJe/B/lpuE+aq6piQAAAABJRU5ErkJggg==" /><!-- --></p>
+</div>
+<div id="bernoulli-accuracy" class="section level2">
+<h2>Bernoulli (accuracy)</h2>
+<p>Binary accuracy is modelled through a logit link. The intercept is
+the log-odds of a correct response, and the effect is a log-odds
+difference between conditions.</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>acc <span class="ot">&lt;-</span> <span class="fu">demo</span>(<span class="st">&quot;bernoulli&quot;</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">effect =</span> <span class="fl">0.5</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="fu">round</span>(acc<span class="sc">$</span>by_group, <span class="dv">3</span>)   <span class="co"># P(correct) by group</span></span></code></pre></div>
+<pre><code>  control treatment 
+    0.446     0.569 </code></pre>
+</div>
+<div id="poisson-counts" class="section level2">
+<h2>Poisson (counts)</h2>
+<p>Counts via a log link (e.g. number of fixations, errors or events).
+An intercept of 1.5 implies a base rate near <code>exp(1.5)</code>.</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>cts <span class="ot">&lt;-</span> <span class="fu">demo</span>(<span class="st">&quot;poisson&quot;</span>, <span class="at">intercept =</span> <span class="fl">1.5</span>, <span class="at">effect =</span> <span class="fl">0.3</span>)</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a><span class="fu">round</span>(cts<span class="sc">$</span>by_group, <span class="dv">2</span>)   <span class="co"># mean count by group</span></span></code></pre></div>
+<pre><code>  control treatment 
+     3.85      5.18 </code></pre>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="fu">table</span>(cts<span class="sc">$</span>y)[<span class="dv">1</span><span class="sc">:</span><span class="dv">8</span>]</span></code></pre></div>
+<pre><code>
+  0   1   2   3   4   5   6   7 
+ 41 225 466 698 711 659 466 334 </code></pre>
+</div>
+<div id="ordinal-likert" class="section level2">
+<h2>Ordinal (Likert)</h2>
+<p>Ordered categorical responses via a cumulative-logit model with user
+thresholds. The effect shifts the latent distribution across the
+thresholds.</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>ord <span class="ot">&lt;-</span> <span class="fu">build_spec</span>(<span class="fu">list</span>(</span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;likert&quot;</span>, <span class="at">seed =</span> <span class="dv">1</span>, <span class="at">design_kind =</span> <span class="st">&quot;between&quot;</span>, <span class="at">n_subject =</span> <span class="dv">4000</span>,</span>
+<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a>  <span class="at">factor_name =</span> <span class="st">&quot;group&quot;</span>, <span class="at">lev1 =</span> <span class="st">&quot;control&quot;</span>, <span class="at">lev2 =</span> <span class="st">&quot;treatment&quot;</span>,</span>
+<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a>  <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">effect =</span> <span class="fl">0.8</span>, <span class="at">family =</span> <span class="st">&quot;ordinal&quot;</span>, <span class="at">resp_name =</span> <span class="st">&quot;rating&quot;</span>,</span>
+<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a>  <span class="at">thresholds =</span> <span class="st">&quot;-2, -0.6, 0.6, 2&quot;</span>))</span>
+<span id="cb18-6"><a href="#cb18-6" tabindex="-1"></a>r <span class="ot">&lt;-</span> <span class="fu">simulate_design</span>(ord)</span>
+<span id="cb18-7"><a href="#cb18-7" tabindex="-1"></a><span class="co"># category proportions by group</span></span>
+<span id="cb18-8"><a href="#cb18-8" tabindex="-1"></a><span class="fu">round</span>(<span class="fu">prop.table</span>(<span class="fu">table</span>(r<span class="sc">$</span>group, r<span class="sc">$</span>rating), <span class="dv">1</span>), <span class="dv">2</span>)</span></code></pre></div>
+<pre><code>           
+               1    2    3    4    5
+  control   0.16 0.30 0.27 0.19 0.08
+  treatment 0.09 0.18 0.29 0.28 0.17</code></pre>
+</div>
+<div id="beta-proportions" class="section level2">
+<h2>Beta (proportions)</h2>
+<p>Bounded proportions in (0, 1) are modelled through a mean–precision
+parameterisation. The mean is <code>logit⁻¹(η)</code> and
+<code>phi</code> is the precision, with larger values giving a tighter
+distribution.</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>bt <span class="ot">&lt;-</span> <span class="fu">demo</span>(<span class="st">&quot;beta&quot;</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">effect =</span> <span class="fl">0.8</span>, <span class="at">phi =</span> <span class="dv">8</span>)</span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a><span class="fu">round</span>(bt<span class="sc">$</span>by_group, <span class="dv">3</span>)   <span class="co"># mean proportion by group</span></span></code></pre></div>
+<pre><code>  control treatment 
+    0.400     0.592 </code></pre>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a><span class="fu">fam_hist</span>(bt<span class="sc">$</span>y, <span class="st">&quot;#2E8B57&quot;</span>, <span class="st">&quot;Beta&quot;</span>, <span class="st">&quot;proportion&quot;</span>)</span></code></pre></div>
+<p><img role="img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAkAAAAFGCAMAAAC19dCEAAAA9lBMVEX9/v0AAAAAADkAAGUAOTkAOY8AZrUui1c5AAA5ADk5AGU5OQA5ZmU5Zo85ZrU5j7U5j9pNTU1NTW5NTY1NbqpNjcdlAABlADllOQBlj49lj7Vlj9pltbVltdpltf1uTU1uTW5uTY1ubk1ubqpujY1uq+KNTU2NTW6NTY2NyP2POQCPZjmPZmWPj2WPtY+P2/2qbk2qbm6q4/21ZgC1Zjm1jzm1tbW1tdq12/21/v3HjU3H/v3MzMzajznaj2XatWXa27Xa29ra/rXa/v3iq27iyMfi/v39tWX9yI3924/927X929r946r9/rX9/sf9/tr9/uL9/v0hofakAAAAUnRSTlP///////////////////////////////////////////////////////////////////////////////////////////////////////////8ArS0McQAAAAlwSFlzAAAOwwAADsMBx2+oZAAADfRJREFUeJztnYl628YVRkM5dpSmi+kkSpu2cupFXrrYkbrEdtSklaIllSjN+79MsRAUSGGoAWbuXGLmnC+xSMiXg7n/MTaRwkcGwIOPtFcAxg0CgRcIBF4gEHiBQOAFAoEXCAReIBB4MVyg00nFx18frXzjf35rBKPCW6DJ5MHy8n//4p3nOsGI8BFot/zy82+33iwtP7iHQBnhLVDx9eHScgTKihAClV9//vNkslUcDl29rndqP3xWP4fECbALK7c459vzw6G5QIf14dHDu14Exo7/QfRW6dHB5DfF1ufvpVPlLuxy5953hVU799kEpU6As7BfHxUboOpU7Or1g8Ux0H/++ZfPJgiUPN67sKt/FDuq+R5sUhpz0NqlIVDy+B9EX72+f7QQqJCn3oVNfvn1v35kF5Y+IQS69+58++ZwuRSo/t4lAqVPiF1Yee619fvClR/KQ6GDrTfF9x4cFedn7MLSJ8BBdHkler4PKx8WZ/APil1Ys0eDtPEWaOtX35XPyguJk+rhZbnhKbY+k4//eLDyUw5ID97OAV4gEHiBQOAFAoEXCAReIBB4gUDgBQKBFwgEXiAQeIFA4EUQgb7XKmZg9WIEYmCvYgRiYK9iBGJgr2IEYmCvYgRiYK9iBGJgr2IEYmCvYgRi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" /><!-- --></p>
+</div>
+<div id="choosing-a-family" class="section level2">
+<h2>Choosing a family</h2>
+<p>The families above, together with the ex-Gaussian, cover the outcome
+types a behavioural study usually produces. The table below sets each
+one against the scale its intercept and effect are written on.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Outcome</th>
+<th>Family</th>
+<th>Scale of the effect</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Continuous, symmetric</td>
+<td><code>gaussian</code></td>
+<td>identity</td>
+</tr>
+<tr class="even">
+<td>Reaction time</td>
+<td><code>shifted_lognormal</code></td>
+<td>log</td>
+</tr>
+<tr class="odd">
+<td>Positive continuous (e.g. reading time)</td>
+<td><code>lognormal</code></td>
+<td>log</td>
+</tr>
+<tr class="even">
+<td>Reaction time, on the response scale</td>
+<td><code>exgaussian</code></td>
+<td>identity</td>
+</tr>
+<tr class="odd">
+<td>Accuracy (0/1)</td>
+<td><code>bernoulli</code></td>
+<td>logit</td>
+</tr>
+<tr class="even">
+<td>Counts</td>
+<td><code>poisson</code></td>
+<td>log</td>
+</tr>
+<tr class="odd">
+<td>Likert / ordered categories</td>
+<td><code>ordinal</code></td>
+<td>logit (cumulative)</td>
+</tr>
+<tr class="even">
+<td>Proportions in (0, 1)</td>
+<td><code>beta</code></td>
+<td>logit (mean)</td>
+</tr>
+</tbody>
+</table>
+<p>These match the families that researchers fit in <code>lme4</code>,
+<code>glmmTMB</code> and <code>brms</code>, so a design simulated here
+corresponds to the model that will later be fit. The point-and-click
+application exposes six of the eight families. The full engine,
+including the plain lognormal, the ex-Gaussian, continuous predictors,
+interactions, nesting and partial crossing, is reached by writing the
+specification directly, as the last section of this vignette shows.</p>
+<p>The <code>exgaussian</code> family, new in 0.3, takes
+<code>sigma</code> and <code>beta</code> and draws a normal plus an
+exponential, mean-centred by subtracting the exponential’s own mean so
+that <span class="math inline">\(\eta\)</span> remains the mean of the
+response. That is brms’s <code>exgaussian(mu, sigma, beta)</code>
+parameterisation, so a specification and the model fitted to it agree on
+what the intercept means. A shifted lognormal will not stand in for it,
+because <code>model_data()</code> logs the response back and leaves a
+symmetric residual on the analysis scale. <code>build_spec()</code> does
+not cover the family either, so an ex-Gaussian design has to be written
+out by hand.</p>
+</div>
+<div id="writing-the-specification-directly" class="section level2">
+<h2>Writing the specification directly</h2>
+<p>The specification is a plain list, so richer designs than the builder
+covers can be assembled by hand. Starting from a
+<code>build_spec()</code> result, the example below adds a continuous
+item-level predictor, an interaction with the categorical effect, a
+per-subject item subset (partial crossing) and an extra grouping factor
+that nests subjects.</p>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a>spec <span class="ot">&lt;-</span> <span class="fu">build_spec</span>(<span class="fu">list</span>(</span>
+<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;reading&quot;</span>, <span class="at">seed =</span> <span class="dv">1</span>, <span class="at">design_kind =</span> <span class="st">&quot;within&quot;</span>, <span class="at">include_items =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a>  <span class="at">n_subject =</span> <span class="dv">12</span>, <span class="at">n_item =</span> <span class="dv">24</span>,</span>
+<span id="cb23-4"><a href="#cb23-4" tabindex="-1"></a>  <span class="at">factor_name =</span> <span class="st">&quot;condition&quot;</span>, <span class="at">lev1 =</span> <span class="st">&quot;related&quot;</span>, <span class="at">lev2 =</span> <span class="st">&quot;unrelated&quot;</span>,</span>
+<span id="cb23-5"><a href="#cb23-5" tabindex="-1"></a>  <span class="at">intercept =</span> <span class="dv">6</span>, <span class="at">effect =</span> <span class="fl">0.05</span>,</span>
+<span id="cb23-6"><a href="#cb23-6" tabindex="-1"></a>  <span class="at">subj_int_sd =</span> <span class="fl">0.12</span>, <span class="at">subj_slope_sd =</span> <span class="fl">0.04</span>, <span class="at">subj_corr =</span> <span class="fl">0.2</span>,</span>
+<span id="cb23-7"><a href="#cb23-7" tabindex="-1"></a>  <span class="at">item_int_sd =</span> <span class="fl">0.08</span>, <span class="at">item_slope_sd =</span> <span class="fl">0.02</span>, <span class="at">item_corr =</span> <span class="sc">-</span><span class="fl">0.1</span>,</span>
+<span id="cb23-8"><a href="#cb23-8" tabindex="-1"></a>  <span class="at">family =</span> <span class="st">&quot;lognormal&quot;</span>, <span class="at">resp_name =</span> <span class="st">&quot;RT&quot;</span>, <span class="at">sigma =</span> <span class="fl">0.25</span>))</span>
+<span id="cb23-9"><a href="#cb23-9" tabindex="-1"></a></span>
+<span id="cb23-10"><a href="#cb23-10" tabindex="-1"></a>spec<span class="sc">$</span>predictors <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb23-11"><a href="#cb23-11" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">name =</span> <span class="st">&quot;freq&quot;</span>, <span class="at">varies_by =</span> <span class="st">&quot;item&quot;</span>, <span class="at">mean =</span> <span class="dv">0</span>, <span class="at">sd =</span> <span class="dv">1</span>)</span>
+<span id="cb23-12"><a href="#cb23-12" tabindex="-1"></a>)</span>
+<span id="cb23-13"><a href="#cb23-13" tabindex="-1"></a><span class="co"># an interaction with the effect</span></span>
+<span id="cb23-14"><a href="#cb23-14" tabindex="-1"></a>spec<span class="sc">$</span>fixed<span class="sc">$</span>coefficients[[<span class="st">&quot;effect:freq&quot;</span>]] <span class="ot">&lt;-</span> <span class="fl">0.02</span></span>
+<span id="cb23-15"><a href="#cb23-15" tabindex="-1"></a><span class="co"># each subject sees 10 of the 24 items</span></span>
+<span id="cb23-16"><a href="#cb23-16" tabindex="-1"></a>spec<span class="sc">$</span>units<span class="sc">$</span>item<span class="sc">$</span>per_subject <span class="ot">&lt;-</span> <span class="dv">10</span></span>
+<span id="cb23-17"><a href="#cb23-17" tabindex="-1"></a><span class="co"># subjects nested in classes</span></span>
+<span id="cb23-18"><a href="#cb23-18" tabindex="-1"></a>spec<span class="sc">$</span>random<span class="sc">$</span>class <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">over =</span> <span class="st">&quot;subject&quot;</span>, <span class="at">n =</span> <span class="dv">6</span>, <span class="at">intercept_sd =</span> <span class="fl">0.05</span>)</span>
+<span id="cb23-19"><a href="#cb23-19" tabindex="-1"></a></span>
+<span id="cb23-20"><a href="#cb23-20" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">simulate_design</span>(spec))</span></code></pre></div>
+<pre><code>  subject item class condition      freq       RT
+1       1    2     1   related  2.355932 558.9340
+2       1    2     1 unrelated  2.355932 609.7181
+3       1    7     1   related -2.020596 449.9641
+4       1    7     1 unrelated -2.020596 630.8554
+5       1    8     1   related  1.017863 507.4829
+6       1    8     1 unrelated  1.017863 445.2669</code></pre>
+<p>The derived columns follow from the specification: <code>freq</code>
+is the continuous predictor and <code>class</code> is the nesting
+factor. The auto-derived formula picks up the interaction as
+<code>effect_freq</code> and the extra grouping factor as
+<code>(1 | class)</code>.</p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a><span class="fu">model_formula</span>(spec)</span></code></pre></div>
+<pre><code>.y ~ effect + effect_freq + (1 + effect | subject) + (1 + effect | 
+    item) + (1 | class)</code></pre>
+<p>Ready-to-run specifications of this kind, including a
+continuous-predictor reading-time design, a nested-clusters design and a
+partial-crossing design, ship in the repository’s <a href="https://github.com/pablobernabeu/pilotr/tree/main/spec/examples"><code>spec/examples/</code></a>
+directory, and <code>load_spec()</code> reads any of them back.</p>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

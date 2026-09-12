@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Precision and ROPE design analysis</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Precision and ROPE design analysis</h1>
+
+
+
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(pilotr)</span></code></pre></div>
+<p>When sample sizes are large, or when the question of interest is
+whether an effect is <em>practically</em> meaningful, power against a
+point null is often the wrong target. pilotr implements a
+precision-based design analysis against a region of practical
+equivalence (ROPE). This is a fast, frequentist analogue of the Bayesian
+approach that compares a highest-density interval with a ROPE.</p>
+<blockquote>
+<p>As in the power vignette, the fixed-<em>N</em> analysis below uses a
+small <code>n_sims</code> so that the vignette builds quickly, and the
+sample-size sweep, which needs far more model fits, was precomputed with
+exactly the code shown and shipped with the package. For real planning
+we recommend <code>n_sims &gt;= 200</code>, the value the sweep
+uses.</p>
+</blockquote>
+<div id="the-idea" class="section level2">
+<h2>The idea</h2>
+<p>Over Monte Carlo replicates, and for each focal fixed effect, pilotr
+records the 95% confidence interval and whether it falls determinately
+outside the ROPE (the effect is practically meaningful) or entirely
+inside it (practical equivalence to zero), together with the expected
+interval width. The interval is a Wald approximation, the estimate plus
+or minus 1.96 standard errors, chosen for speed and for comparability
+across replicates. Sweeping sample size then locates the minimum
+<em>N</em> at which a focal effect reaches a determinate decision with a
+target probability.</p>
+</div>
+<div id="a-worked-design" class="section level2">
+<h2>A worked design</h2>
+<p>We reuse the crossed priming design, which represents a small priming
+effect on log reaction time.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>spec_c <span class="ot">&lt;-</span> <span class="fu">build_spec</span>(<span class="fu">list</span>(</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;priming&quot;</span>, <span class="at">seed =</span> <span class="dv">1</span>, <span class="at">design_kind =</span> <span class="st">&quot;within&quot;</span>, <span class="at">include_items =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>  <span class="at">n_subject =</span> <span class="dv">24</span>, <span class="at">n_item =</span> <span class="dv">18</span>,</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>  <span class="at">factor_name =</span> <span class="st">&quot;condition&quot;</span>, <span class="at">lev1 =</span> <span class="st">&quot;related&quot;</span>, <span class="at">lev2 =</span> <span class="st">&quot;unrelated&quot;</span>,</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>  <span class="at">intercept =</span> <span class="dv">6</span>, <span class="at">effect =</span> <span class="fl">0.05</span>,</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>  <span class="at">subj_int_sd =</span> <span class="fl">0.12</span>, <span class="at">subj_slope_sd =</span> <span class="fl">0.04</span>, <span class="at">subj_corr =</span> <span class="fl">0.2</span>,</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>  <span class="at">item_int_sd =</span> <span class="fl">0.08</span>, <span class="at">item_slope_sd =</span> <span class="fl">0.02</span>, <span class="at">item_corr =</span> <span class="sc">-</span><span class="fl">0.1</span>,</span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>  <span class="at">family =</span> <span class="st">&quot;shifted_lognormal&quot;</span>, <span class="at">resp_name =</span> <span class="st">&quot;RT&quot;</span>, <span class="at">sigma =</span> <span class="fl">0.3</span>, <span class="at">shift =</span> <span class="dv">200</span>))</span></code></pre></div>
+<p>So that the analysis can run from the specification alone, pilotr
+auto-derives the analysis model, including the contrast columns, the
+response transform and the mixed-model formula.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">model_formula</span>(spec_c)</span></code></pre></div>
+<pre><code>.y ~ effect + (1 + effect | subject) + (1 + effect | item)</code></pre>
+<p>The companion <code>model_data()</code> adds the other two
+derivations to a simulated data set, the numeric <code>effect</code>
+contrast column the formula’s terms refer to and the <code>.y</code>
+response, here the log-transformed RT because the family is
+<code>shifted_lognormal</code>.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">model_data</span>(spec_c, <span class="fu">simulate_design</span>(spec_c)))</span></code></pre></div>
+<pre><code>  subject item condition       RT       .y effect
+1       1    1   related 688.7993 6.191952   -0.5
+2       1    1 unrelated 778.3731 6.360219    0.5
+3       1    2   related 884.1392 6.528161   -0.5
+4       1    2 unrelated 788.8995 6.378256    0.5
+5       1    3   related 651.0253 6.111523   -0.5
+6       1    3 unrelated 518.3355 5.763106    0.5</code></pre>
+</div>
+<div id="precision-at-a-fixed-n" class="section level2">
+<h2>Precision at a fixed <em>N</em></h2>
+<p>We declare the focal effect (its coefficient name and true value) and
+a ROPE half-width. Here the effect lives on the log scale, and we treat
+anything smaller than 0.02 as practically equivalent to zero.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>pr <span class="ot">&lt;-</span> <span class="fu">precision_design</span>(</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  spec_c, <span class="at">focal =</span> <span class="fu">c</span>(<span class="at">effect =</span> <span class="fl">0.05</span>), <span class="at">rope =</span> <span class="fl">0.02</span>, <span class="at">n_sims =</span> <span class="dv">25</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>pr</span></code></pre></div>
+<pre><code>   param true mean_ci_width p_meaningful p_meaningful_mcse p_meaningful_lo
+1 effect 0.05    0.09809118         0.28        0.08979978       0.1428385
+  p_meaningful_hi p_equivalent p_equivalent_mcse p_equivalent_lo
+1       0.4757661            0                 0               0
+  p_equivalent_hi n_attempted n_returned n_converged n_singular n_warning
+1       0.1331923          25         25           8         17        17</code></pre>
+<p>The columns are interpreted as follows. <code>p_meaningful</code> is
+the probability the 95% CI lands entirely outside the ROPE, a
+determinate ‘meaningful’ decision. <code>p_equivalent</code> is the
+probability it lands entirely inside, a determinate ‘equivalent’
+decision. <code>mean_ci_width</code> is the expected precision.</p>
+</div>
+<div id="sweeping-sample-size" class="section level2">
+<h2>Sweeping sample size</h2>
+<p>The same ROPE has to be carried into the sweep. Leaving
+<code>rope</code> at its default would compare the interval against a
+region as wide as the effect itself, and the decision probability would
+then fall away as <em>N</em> grew, which is backwards.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>prc <span class="ot">&lt;-</span> <span class="fu">precision_curve</span>(spec_c, <span class="at">focal =</span> <span class="fu">c</span>(<span class="at">effect =</span> <span class="fl">0.05</span>),</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>                       <span class="at">subject_ns =</span> <span class="fu">c</span>(<span class="dv">15</span>, <span class="dv">30</span>, <span class="dv">60</span>, <span class="dv">100</span>, <span class="dv">140</span>, <span class="dv">180</span>, <span class="dv">220</span>, <span class="dv">260</span>),</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>                       <span class="at">rope =</span> <span class="fl">0.02</span>, <span class="at">n_sims =</span> <span class="dv">200</span>)</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>prc[, <span class="fu">c</span>(<span class="st">&quot;n_subject&quot;</span>, <span class="st">&quot;p_meaningful&quot;</span>, <span class="st">&quot;p_equivalent&quot;</span>, <span class="st">&quot;mean_ci_width&quot;</span>,</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>        <span class="st">&quot;n_converged&quot;</span>)]</span></code></pre></div>
+<pre><code>  n_subject p_meaningful p_equivalent mean_ci_width n_converged
+1        15        0.140            0    0.12163610         200
+2        30        0.290            0    0.08462110         200
+3        60        0.525            0    0.05996175         200
+4       100        0.740            0    0.04732256         200
+5       140        0.845            0    0.04069929         200
+6       180        0.885            0    0.03678134         200
+7       220        0.925            0    0.03369284         200
+8       260        0.940            0    0.03166924         200</code></pre>
+<p>As <em>N</em> grows the interval tightens and
+<code>p_meaningful</code> rises, so the design reaches a determinate
+decision more reliably. That is a more informative criterion than power
+against a point null, because it asks whether the study can distinguish
+the effect from a negligible one, where power asks only whether it can
+be distinguished from zero. Each estimate rests on 200 replicates, all
+of which converged, so its Monte Carlo standard error is at most about
+0.035, which the figure below shows as a band.</p>
+<p>Scanning the table for the smallest simulated <em>N</em> that meets a
+target of ‘<code>p_meaningful</code> ≥ 0.90’ puts this design at 220
+subjects, but that answer is a property of where the grid points happen
+to fall. <code>solve_curve()</code> fits the decision probability
+against the sample size and inverts the fit, so all eight points inform
+the answer, where scanning the table uses only the two either side of
+the target.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>solved <span class="ot">&lt;-</span> <span class="fu">solve_curve</span>(prc, <span class="at">target =</span> <span class="fl">0.9</span>)</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="fu">unlist</span>(solved[<span class="fu">c</span>(<span class="st">&quot;value&quot;</span>, <span class="st">&quot;lo&quot;</span>, <span class="st">&quot;hi&quot;</span>, <span class="st">&quot;dispersion&quot;</span>)])</span></code></pre></div>
+<pre><code>     value         lo         hi dispersion 
+185.487051 164.932098 207.248760   2.313862 </code></pre>
+<p>The sweep read by eye therefore asks for some thirty-five subjects
+more than the fitted crossing does, and 220 sits outside the interval
+altogether. The fit is a binomial probit regression weighted by the
+replicates behind each point, and the interval is the delta-method
+interval that <code>MASS::dose.p()</code> computes for a fitted
+<code>glm</code>. The interval matters more here than the point it
+surrounds: with 200 replicates per point this design needs somewhere
+between about 165 and 207 subjects to reach a determinate ROPE decision
+nine times in ten, and a preregistration quoting a single figure would
+be claiming more than the simulation supports.</p>
+<p>The reported <code>dispersion</code> above 1 is part of that width.
+It says the eight points scatter about the fitted curve rather more than
+their replicate counts alone would explain, so the interval has been
+widened to match, which is the heterogeneity factor of classical probit
+analysis doing its work. Nothing is extrapolated either: a curve that
+never reaches the target within the sizes swept is refused, and the
+refusal reports the range the sweep did cover.</p>
+<p><code>p_equivalent</code> stays at 0 throughout, and correctly so.
+The true effect of 0.05 lies outside the ROPE by construction, so no
+interval should ever land entirely inside it. The column earns its place
+in designs where practical equivalence is the hypothesis of
+interest.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="co"># Each probability is a proportion over the converged replicates, so it carries</span></span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a><span class="co"># a binomial Monte Carlo standard error, and the band is its 95% interval. The</span></span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="co"># two panels are on different scales, hence the free y axis.</span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>prc<span class="sc">$</span>se <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(prc<span class="sc">$</span>p_meaningful <span class="sc">*</span> (<span class="dv">1</span> <span class="sc">-</span> prc<span class="sc">$</span>p_meaningful) <span class="sc">/</span> prc<span class="sc">$</span>n_converged)</span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>panels <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;P(CI outside the ROPE)&quot;</span>, <span class="st">&quot;Mean 95% CI width&quot;</span>)</span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>long <span class="ot">&lt;-</span> <span class="fu">rbind</span>(</span>
+<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a>  <span class="fu">data.frame</span>(<span class="at">n_subject =</span> prc<span class="sc">$</span>n_subject, <span class="at">panel =</span> panels[<span class="dv">1</span>], <span class="at">y =</span> prc<span class="sc">$</span>p_meaningful,</span>
+<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a>             <span class="at">lo =</span> <span class="fu">pmax</span>(<span class="dv">0</span>, prc<span class="sc">$</span>p_meaningful <span class="sc">-</span> <span class="fl">1.96</span> <span class="sc">*</span> prc<span class="sc">$</span>se),</span>
+<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a>             <span class="at">hi =</span> <span class="fu">pmin</span>(<span class="dv">1</span>, prc<span class="sc">$</span>p_meaningful <span class="sc">+</span> <span class="fl">1.96</span> <span class="sc">*</span> prc<span class="sc">$</span>se)),</span>
+<span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a>  <span class="fu">data.frame</span>(<span class="at">n_subject =</span> prc<span class="sc">$</span>n_subject, <span class="at">panel =</span> panels[<span class="dv">2</span>],</span>
+<span id="cb13-12"><a href="#cb13-12" tabindex="-1"></a>             <span class="at">y =</span> prc<span class="sc">$</span>mean_ci_width,</span>
+<span id="cb13-13"><a href="#cb13-13" tabindex="-1"></a>             <span class="at">lo =</span> <span class="cn">NA</span>, <span class="at">hi =</span> <span class="cn">NA</span>))</span>
+<span id="cb13-14"><a href="#cb13-14" tabindex="-1"></a>long<span class="sc">$</span>panel <span class="ot">&lt;-</span> <span class="fu">factor</span>(long<span class="sc">$</span>panel, <span class="at">levels =</span> panels)</span>
+<span id="cb13-15"><a href="#cb13-15" tabindex="-1"></a><span class="co"># 0.90 is the target decision probability. 0.06 is the width at which a CI</span></span>
+<span id="cb13-16"><a href="#cb13-16" tabindex="-1"></a><span class="co"># centred on the true effect just clears the ROPE, that is 2 * (0.05 - 0.02).</span></span>
+<span id="cb13-17"><a href="#cb13-17" tabindex="-1"></a>refs <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">panel =</span> <span class="fu">factor</span>(panels, <span class="at">levels =</span> panels), <span class="at">ref =</span> <span class="fu">c</span>(<span class="fl">0.90</span>, <span class="fl">0.06</span>))</span>
+<span id="cb13-18"><a href="#cb13-18" tabindex="-1"></a><span class="co"># The solved sample size and its interval, drawn only on the decision panel,</span></span>
+<span id="cb13-19"><a href="#cb13-19" tabindex="-1"></a><span class="co"># since the width panel is on a different scale and answers a different question.</span></span>
+<span id="cb13-20"><a href="#cb13-20" tabindex="-1"></a>solve_band <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">panel =</span> <span class="fu">factor</span>(panels[<span class="dv">1</span>], <span class="at">levels =</span> panels),</span>
+<span id="cb13-21"><a href="#cb13-21" tabindex="-1"></a>                         <span class="at">lo =</span> solved<span class="sc">$</span>lo, <span class="at">hi =</span> solved<span class="sc">$</span>hi, <span class="at">at =</span> solved<span class="sc">$</span>value)</span>
+<span id="cb13-22"><a href="#cb13-22" tabindex="-1"></a></span>
+<span id="cb13-23"><a href="#cb13-23" tabindex="-1"></a><span class="fu">ggplot</span>(long, <span class="fu">aes</span>(n_subject, y)) <span class="sc">+</span></span>
+<span id="cb13-24"><a href="#cb13-24" tabindex="-1"></a>  <span class="fu">geom_hline</span>(<span class="at">data =</span> refs, <span class="fu">aes</span>(<span class="at">yintercept =</span> ref), <span class="at">linetype =</span> <span class="dv">2</span>,</span>
+<span id="cb13-25"><a href="#cb13-25" tabindex="-1"></a>             <span class="at">colour =</span> <span class="st">&quot;grey60&quot;</span>) <span class="sc">+</span></span>
+<span id="cb13-26"><a href="#cb13-26" tabindex="-1"></a>  <span class="fu">geom_rect</span>(<span class="at">data =</span> solve_band, <span class="at">inherit.aes =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb13-27"><a href="#cb13-27" tabindex="-1"></a>            <span class="fu">aes</span>(<span class="at">xmin =</span> lo, <span class="at">xmax =</span> hi, <span class="at">ymin =</span> <span class="sc">-</span><span class="cn">Inf</span>, <span class="at">ymax =</span> <span class="cn">Inf</span>),</span>
+<span id="cb13-28"><a href="#cb13-28" tabindex="-1"></a>            <span class="at">fill =</span> <span class="st">&quot;grey60&quot;</span>, <span class="at">alpha =</span> .<span class="dv">15</span>) <span class="sc">+</span></span>
+<span id="cb13-29"><a href="#cb13-29" tabindex="-1"></a>  <span class="fu">geom_vline</span>(<span class="at">data =</span> solve_band, <span class="fu">aes</span>(<span class="at">xintercept =</span> at), <span class="at">linetype =</span> <span class="dv">2</span>,</span>
+<span id="cb13-30"><a href="#cb13-30" tabindex="-1"></a>             <span class="at">colour =</span> <span class="st">&quot;grey60&quot;</span>) <span class="sc">+</span></span>
+<span id="cb13-31"><a href="#cb13-31" tabindex="-1"></a>  <span class="fu">geom_ribbon</span>(<span class="fu">aes</span>(<span class="at">ymin =</span> lo, <span class="at">ymax =</span> hi), <span class="at">alpha =</span> .<span class="dv">15</span>, <span class="at">fill =</span> <span class="st">&quot;#2C6FB0&quot;</span>,</span>
+<span id="cb13-32"><a href="#cb13-32" tabindex="-1"></a>              <span class="at">na.rm =</span> <span class="cn">TRUE</span>) <span class="sc">+</span></span>
+<span id="cb13-33"><a href="#cb13-33" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="at">colour =</span> <span class="st">&quot;#2C6FB0&quot;</span>, <span class="at">linewidth =</span> <span class="fl">0.8</span>) <span class="sc">+</span></span>
+<span id="cb13-34"><a href="#cb13-34" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">colour =</span> <span class="st">&quot;#2C6FB0&quot;</span>, <span class="at">size =</span> <span class="fl">2.2</span>) <span class="sc">+</span></span>
+<span id="cb13-35"><a href="#cb13-35" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span> panel, <span class="at">scales =</span> <span class="st">&quot;free_y&quot;</span>) <span class="sc">+</span></span>
+<span id="cb13-36"><a href="#cb13-36" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="fu">expression</span>(<span class="fu">italic</span>(N) <span class="sc">~</span> <span class="st">&quot;subjects&quot;</span>), <span class="at">y =</span> <span class="cn">NULL</span>) <span class="sc">+</span></span>
+<span id="cb13-37"><a href="#cb13-37" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">12</span>) <span class="sc">+</span></span>
+<span id="cb13-38"><a href="#cb13-38" tabindex="-1"></a>  <span class="co"># theme_minimal still paints a white plot.background over the transparent</span></span>
+<span id="cb13-39"><a href="#cb13-39" tabindex="-1"></a>  <span class="co"># canvas, so both surfaces have to be cleared for the page colour to reach the</span></span>
+<span id="cb13-40"><a href="#cb13-40" tabindex="-1"></a>  <span class="co"># figure.</span></span>
+<span id="cb13-41"><a href="#cb13-41" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">plot.background  =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">colour =</span> <span class="cn">NA</span>),</span>
+<span id="cb13-42"><a href="#cb13-42" tabindex="-1"></a>        <span class="at">panel.background =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">colour =</span> <span class="cn">NA</span>),</span>
+<span id="cb13-43"><a href="#cb13-43" tabindex="-1"></a>        <span class="at">panel.grid       =</span> <span class="fu">element_line</span>(<span class="at">colour =</span> <span class="st">&quot;grey80&quot;</span>),</span>
+<span id="cb13-44"><a href="#cb13-44" tabindex="-1"></a>        <span class="at">strip.background =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">colour =</span> <span class="cn">NA</span>))</span></code></pre></div>
+<p><img role="img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnAAAAEzCAMAAACG6c7OAAABVlBMVEX9/v0AAAAAADkAAGUAOY8AZmUAZrUZGUgZGXAZSEgZSJYZcHAZcLkaGhosb7A5AAA5ADk5AGU5j7U5j9pIGRlIGUhIGXBISBlISEhISJZIcLlIlpZIlrlIlttNTU1NTW5NTY1NbqpNjcdlAABlADllj49ltbVltf1uTU1uTW5uTY1ubk1ubqpujY1uq+JwGRlwGUhwGXBwlpZwuv2Jk5yNTU2NTW6NTY2NyP2POQCPj2WP2/2WSBmWSEiWSHCWlkiWlnCWupaW3LmW3NuW3P2ZmZmqbk2qbm6q4/2tt8G0vsi1ZgC1/rW1/v25cBm5cEi5unC53Ja5/rm5/tu5/v3ExMTHjU3H/v3MzMzR3OXajzna/v3blkjb3Jbb/rnb/v3e6fLiq27iyMfi/v3u7+79tWX9unD9yI3924/93Jb946r9/rX9/rn9/sf9/tr9/tv9/uL9/v3vx8X7AAAAcnRSTlP//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////wB818voAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAX/ElEQVR4nO2d+3vcxnWGw1i13ZRap7WkxEm1iqymkuKLpMqUqSZtklaSKSpWEleWqUviXdMmTYorE///L50bgBlgAMwAc8Esvu/xY2B3cfYARy/OnANwMT/KICigfhR7B6BpCcBBQQXgoKACcFBQATgoqAAcFFQADgoqAAcFFYCDggrAQUEF4KCgAnBQUAE4KKgAHBRUAA4KKgAHBVUo4I7OnSV66x5ZfXmRv9wkiwtP2q345yc37+k/qDl4+4lYpSuFT75C3jv6hbMDiqCjc+zwTm683RI1cqw/+ZofO1m+PHv2thKthsCrge76ZxmiYMCxYzgg//ont55kByRkP/xuU39k9TdV4OjnGuDYO49JkA9ojKmnwme59ePbjo4nho7O/4zu/sE/tvBwcuNi9pIQdbDJXt28d0AiUh51a+DZ9vroulNY4H743W2a4E5u0Agcnb/nHDjyf+qD6OVPvi58llvT8Cerowu/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" /><!-- --></p>
+<p>The two panels answer the same question from either side. On the
+left, the horizontal dashed line marks the 0.90 target, and the vertical
+band the sample size solved against it. On the right the dashed line
+marks a width of 0.06, which is where a confidence interval centred on
+the true effect just clears a ROPE of 0.02, since the interval has to
+keep its lower limit above the ROPE and so must be narrower than 2 ×
+(0.05 − 0.02). Width falls below that line well before the decision
+probability reaches 0.90, because an interval centred exactly on the
+true effect is the best case and sampling variation moves the centre
+about.</p>
+</div>
+<div id="see-also" class="section level2">
+<h2>See also</h2>
+<p>The <a href="power-analysis.html">power vignette</a> covers
+simulation-based power and Type S/M errors. The <a href="getting-started.html">getting-started vignette</a> covers the core
+simulate-and-inspect loop.</p>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
