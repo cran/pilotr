@@ -1,7 +1,7 @@
 Package: pilotr
 Title: Simulate Experimental and Behavioural Data from a Portable
         Design Specification
-Version: 0.3.0
+Version: 0.3.1
 Authors@R: 
     person("Pablo", "Bernabeu", role = c("aut", "cre"),
            email = "pcbernabeu@gmail.com",
@@ -33,9 +33,9 @@ VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0
 NeedsCompilation: no
-Packaged: 2026-09-01 09:05:54 UTC; PabloB
+Packaged: 2026-09-19 13:27:29 UTC; PabloB
 Author: Pablo Bernabeu [aut, cre] (ORCID:
     <https://orcid.org/0000-0003-1083-2460>)
 Maintainer: Pablo Bernabeu <pcbernabeu@gmail.com>
 Repository: CRAN
-Date/Publication: 2026-09-12 07:30:08 UTC
+Date/Publication: 2026-09-20 21:50:02 UTC

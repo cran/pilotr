@@ -1,7 +1,7 @@
-883b19ef8281beb3683f9d935946c82a *DESCRIPTION
+6b524cf2f2b9df33563176e8e22329b4 *DESCRIPTION
 04ea956d9db8548f60b7d8b6b312034e *LICENSE
 6afc225f0db61680bf00e6a829180933 *NAMESPACE
-a01ebd62b11a9bcaf81e970ae0cd64cc *NEWS.md
+e4dcb9141af9c01346cfa70f1bc3fb20 *NEWS.md
 38413048de639456a8ebf5ab178d9571 *R/autoformula.R
 31fb415faff1844fecd82a93aa983a7a *R/brms_bridge.R
 e7027c8d91eeeed6254fef4df63e80c1 *R/core.R
@@ -18,7 +18,7 @@ af51464c262abd93966dc56f597d74b5 *R/response_variance.R
 b0a6ace0020ceade894485f7f53b21b2 *R/run_app.R
 d64a5b0c3b71336c117c16f2b59be314 *R/simulate.R
 6e488dd02d8d36d745d8ab6cd3e939a9 *R/solve_curve.R
-ae458ebf595247822b09424166cd851d *R/spec_builder.R
+2d511c40715852e2594733595b82f796 *R/spec_builder.R
 0c0d2f00a4c1aaae427ba7aa79d22557 *R/spec_from_model.R
 d9153fa1411cadb4655895c8a70a3336 *R/sweep.R
 b937889240608de8583e5ae42e69a055 *R/validate.R
@@ -65,7 +65,7 @@ d85203fa33463fb9ddba006f08d48b21 *man/default_response_name.Rd
 7b16d4d6c02f284e0ae932485cba11bc *man/design_conditions.Rd
 51f1fdb6782f689f7c13e7695203e6cf *man/figures/logo.png
 bace03902d2ccdd3e0013245710c5e4b *man/generate_design_analysis.Rd
-6a86e169c07df5b2a0f79516c6b37861 *man/generate_r_script.Rd
+23d0f65213c9d3ebecf0c9f8078c02d5 *man/generate_r_script.Rd
 092773df0f524b050c2e16a4c39b7df8 *man/load_spec.Rd
 106ceb70e64e223c28a0d401aa3b02bc *man/make_rng.Rd
 2bf9e955e1ca80fdb0aa6ded061607f8 *man/model_data.Rd
@@ -85,13 +85,13 @@ a76e51b9813f4d75582587b108a396bb *man/replicate_seeds.Rd
 403a2a953124403ed49e8c034cd638d6 *man/simulate_design.Rd
 4d8ba6ce79796079409904205bc3d227 *man/solve_curve.Rd
 7cced85ad407309687acf35b1952381d *man/spec_from_model.Rd
-78ab8addc8668df616e8466715f11c8b *man/spec_json.Rd
+0f418e27774b711041c9b8a80996f899 *man/spec_json.Rd
 18a6bf60ac4151ac26ba1c0a16a0dff1 *man/sweep_spec.Rd
 c53ee4a41320ec348af969292b8c9bdf *man/target_n.Rd
 a98deb855cc9f55777c8200b8e8a13f8 *man/validate_spec.Rd
 7c347d2431301b258c728c74c4fdd90c *tests/testthat.R
 e853eb7012833245370aec8c4188f233 *tests/testthat/test-brms-bridge.R
-e45603aa692be67c9061fd3fa0ecf008 *tests/testthat/test-core.R
+6c81ae2fea150ebc6fa06343469deeaa *tests/testthat/test-core.R
 10207c8b63257647e7c0be88c05cd887 *tests/testthat/test-design-analysis.R
 c5151f5a0c20db4c6921ff1a5e83cd22 *tests/testthat/test-examples.R
 57d46d29b9bf15ccf2793d7bd2d18ae1 *tests/testthat/test-parallel.R
