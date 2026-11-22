@@ -17,7 +17,8 @@ fake_power <- function() {
     power_lo = c(effect = 0.551), power_hi = c(effect = 0.686),
     n_significant = c(effect = 123L), true_effect = c(effect = 0.4),
     mean_estimate = c(effect = 0.41),
-    type_s = c(effect = 0), type_m = c(effect = 1.32))
+    type_s = c(effect = 0), type_s_lo = c(effect = 0), type_s_hi = c(effect = 0.0303),
+    type_m = c(effect = 1.32), type_m_mcse = c(effect = 0.0214))
   class(out) <- c("pilotr_power", "list")
   out
 }
@@ -46,6 +47,61 @@ test_that("the singularity note is part of the same block", {
   note <- grep("boundary-singular", out)
   expect_length(note, 1L)
   expect_true(note < length(out))
+})
+
+test_that("the fitter and its test are printed with the fit counts", {
+  x <- fake_power()
+  x$fitter <- "lme4::glmer (binomial), Wald z"
+  out <- capture.output(print(x))
+  line <- grep("lme4::glmer (binomial), Wald z", out, fixed = TRUE)
+  expect_length(line, 1L)
+  expect_true(line < grep("198 returned", out))
+  # A result saved by an earlier version has no fitter, and prints as it did.
+  expect_false(any(grepl("fitter", capture.output(print(fake_power())))))
+})
+
+test_that("Type S and Type M are printed with their Monte Carlo error", {
+  out <- capture.output(print(fake_power()))
+  heading <- grep("Type S and Type M, over the significant replicates", out, fixed = TRUE)
+  expect_length(heading, 1L)
+  expect_true(heading > grep("[0.551, 0.686]", out, fixed = TRUE))
+  expect_true(any(grepl("^\\s*effect\\s+type_s\\s+type_s_ci95\\s+type_m\\s+type_m_mcse\\s*$", out)))
+  expect_true(any(grepl("[0.000, 0.030]", out, fixed = TRUE)))
+  expect_true(any(grepl("0.021", out, fixed = TRUE)))
+})
+
+test_that("digits sets the decimal places of the rates and of the intervals", {
+  out <- capture.output(print(fake_power(), digits = 2))
+  expect_true(any(grepl("[0.55, 0.69]", out, fixed = TRUE)))
+  expect_true(any(grepl("[0.00, 0.03]", out, fixed = TRUE)))
+  expect_true(any(grepl(" 0.62 ", out, fixed = TRUE)))
+  expect_false(any(grepl("0.551", out, fixed = TRUE)))
+})
+
+test_that("a result saved before the Type S interval existed prints without it", {
+  x <- fake_power()
+  x$type_s_lo <- x$type_s_hi <- x$type_m_mcse <- NULL
+  out <- capture.output(print(x))
+  expect_true(any(grepl("^\\s*effect\\s+type_s\\s+type_m\\s*$", out)))
+  expect_false(any(grepl("type_s_ci95|type_m_mcse", out)))
+})
+
+test_that("a ladder's share of replicates at each rung is printed with the fit counts", {
+  x <- fake_power()
+  x$rung_shares <- c(maximal = 0.3, zcp = 0.02, intercepts = 0.68)
+  x$fallback <- "singular"
+  out <- capture.output(print(x))
+  line <- grep("analysed at each rung", out, fixed = TRUE)
+  expect_length(line, 1L)
+  expect_true(line > grep("198 returned", out))
+  expect_true(grepl("maximal 0.300, zcp 0.020, intercepts 0.680", out[line], fixed = TRUE))
+  expect_true(grepl("singular fits", out[line], fixed = TRUE))
+  x$fallback <- "warning"
+  out <- capture.output(print(x, digits = 2))
+  expect_true(any(grepl("singular fits and fits with warnings", out, fixed = TRUE)))
+  expect_true(any(grepl("maximal 0.30, zcp 0.02, intercepts 0.68", out, fixed = TRUE)))
+  # A single model has no rungs to report.
+  expect_false(any(grepl("rung", capture.output(print(fake_power())))))
 })
 
 test_that("printing returns its input invisibly", {

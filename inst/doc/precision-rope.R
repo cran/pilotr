@@ -10,7 +10,7 @@ options(cli.num_colors = 1, cli.hyperlink = FALSE, crayon.enabled = FALSE,
 ## ----setup--------------------------------------------------------------------
 library(pilotr)
 
-## -----------------------------------------------------------------------------
+## ----priming-spec-------------------------------------------------------------
 spec_c <- build_spec(list(
   name = "priming", seed = 1, design_kind = "within", include_items = TRUE,
   n_subject = 24, n_item = 18,
@@ -31,38 +31,50 @@ pr <- precision_design(
   spec_c, focal = c(effect = 0.05), rope = 0.02, n_sims = 25)
 pr
 
-## ----eval = FALSE-------------------------------------------------------------
+## ----precision-curve, eval = FALSE--------------------------------------------
 # prc <- precision_curve(spec_c, focal = c(effect = 0.05),
 #                        subject_ns = c(15, 30, 60, 100, 140, 180, 220, 260),
 #                        rope = 0.02, n_sims = 200)
-# prc[, c("n_subject", "p_meaningful", "p_equivalent", "mean_ci_width",
-#         "n_converged")]
+# print(prc[, c("n_subject", "p_meaningful", "p_equivalent", "mean_ci_width",
+#               "n_returned", "n_singular")], digits = 3)
 
 ## ----include = FALSE----------------------------------------------------------
-# The result of running exactly the chunk above, precomputed and shipped with
-# the package so that the vignette builds within CRAN's check-time budget. All
-# 200 replicates converged at every sample size.
+# The result of running exactly the chunk above, precomputed by tools/vignette-caches.R and
+# shipped with the package so that the vignette builds within CRAN's check-time budget.
 prc <- read.csv("precision-curve-cache.csv")
 
 ## ----echo = FALSE-------------------------------------------------------------
-prc[, c("n_subject", "p_meaningful", "p_equivalent", "mean_ci_width",
-        "n_converged")]
+print(prc[, c("n_subject", "p_meaningful", "p_equivalent", "mean_ci_width",
+              "n_returned", "n_singular")], digits = 3)
+
+## ----include = FALSE----------------------------------------------------------
+# The figures the paragraphs below quote, computed from the cached sweep.
+first <- prc[1, ]
+last <- prc[nrow(prc), ]
+returned <- unique(prc$n_returned)
+returned <- if (length(returned) == 1L) returned else
+  paste("between", min(returned), "and", max(returned))
+by_eye <- min(prc$n_subject[prc$p_meaningful >= 0.9])
 
 ## -----------------------------------------------------------------------------
 solved <- solve_curve(prc, target = 0.9)
 unlist(solved[c("value", "lo", "hi", "dispersion")])
 
+## ----include = FALSE----------------------------------------------------------
+# The interval as the paragraph below quotes it, rounded outwards to whole subjects, and where the
+# size read by eye falls against those rounded bounds, so that the two statements agree.
+shown <- c(floor(solved$lo), ceiling(solved$hi))
+where <- if (by_eye > shown[2]) "above" else if (by_eye < shown[1]) "below" else "inside"
+
 ## ----fig.width = 6.5, fig.height = 3.2, dev.args = list(bg = "transparent")----
 library(ggplot2)
-# Each probability is a proportion over the converged replicates, so it carries
-# a binomial Monte Carlo standard error, and the band is its 95% interval. The
-# two panels are on different scales, hence the free y axis.
-prc$se <- sqrt(prc$p_meaningful * (1 - prc$p_meaningful) / prc$n_converged)
+# Each probability is a proportion over the replicates that returned an
+# estimate, and the sweep carries its 95% Wilson interval, which the band draws.
+# The two panels are on different scales, hence the free y axis.
 panels <- c("P(CI outside the ROPE)", "Mean 95% CI width")
 long <- rbind(
   data.frame(n_subject = prc$n_subject, panel = panels[1], y = prc$p_meaningful,
-             lo = pmax(0, prc$p_meaningful - 1.96 * prc$se),
-             hi = pmin(1, prc$p_meaningful + 1.96 * prc$se)),
+             lo = prc$p_meaningful_lo, hi = prc$p_meaningful_hi),
   data.frame(n_subject = prc$n_subject, panel = panels[2],
              y = prc$mean_ci_width,
              lo = NA, hi = NA))

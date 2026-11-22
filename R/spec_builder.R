@@ -5,19 +5,35 @@
 #' Default response-column name for a family
 #'
 #' @param family A response-family name, one of `"gaussian"`, `"lognormal"`,
-#'   `"shifted_lognormal"`, `"bernoulli"`, `"poisson"`, `"ordinal"`, or
+#'   `"shifted_lognormal"`, `"exgaussian"`, `"bernoulli"`, `"poisson"`, `"ordinal"` or
 #'   `"beta"`.
-#' @return The conventional response-column name for that family (for example `"RT"` for
-#'   `"lognormal"` and `"shifted_lognormal"`), or `"outcome"` for an unrecognised family.
+#' @return The conventional response-column name for that family (for example `"RT"` for the
+#'   reaction-time families `"lognormal"`, `"shifted_lognormal"` and `"exgaussian"`), or
+#'   `"outcome"` for an unrecognised family.
 #' @examples
 #' default_response_name("bernoulli")
 #' @export
 default_response_name <- function(family) {
   switch(family,
-         gaussian = "score", lognormal = "RT", shifted_lognormal = "RT",
+         gaussian = "score", lognormal = "RT", shifted_lognormal = "RT", exgaussian = "RT",
          bernoulli = "accuracy", poisson = "count", ordinal = "rating",
          beta = "proportion", "outcome")
 }
+
+# A seed as a specification stores it. A whole seed inside R's integer range is an integer. A
+# larger whole seed stays a double, which as.integer() would turn into NA with a coercion warning,
+# although every seed up to 2^53 - 1 is valid and spec_json() writes it exactly. Anything else is
+# returned untouched, for validate_spec() to refuse in its own words, where as.integer() would
+# truncate 1.5 to 1 in silence.
+.as_seed <- function(x) {
+  if (!.is_whole(x)) return(x)
+  if (abs(x) < 2^31) as.integer(x) else as.numeric(x)
+}
+
+# A number of subjects or items, by the seed's rule. A count that is not a whole number reaches
+# validate_spec(), which refuses it, where as.integer() would truncate 10.5 subjects to 10 in
+# silence and describe a design nobody had asked for.
+.as_count <- function(x) if (.is_whole(x) && abs(x) < 2^31) as.integer(x) else x
 
 #' Build a design specification from a flat list of design inputs
 #'
@@ -25,18 +41,38 @@ default_response_name <- function(family) {
 #' [spec_json()]) from the flat set of inputs collected by the no-code
 #' application: sample sizes, the two-level factor and its levels, the fixed
 #' intercept and effect, the random-effect standard deviations for
-#' within-subject and crossed designs, and the response family with its
-#' parameters.
+#' within-subject and crossed designs and the response family with its parameters.
 #'
 #' @param p A named list of design inputs. Common fields are `name`, `seed`,
-#'   `n_subject`, `design_kind` (`"between"` or `"within"`), `include_items`,
-#'   `n_item`, `factor_name`, `lev1`, `lev2`, `intercept`, `effect`,
-#'   `family`, `resp_name`, and family parameters such as `sigma`, `shift`,
-#'   `thresholds`, or `phi`; within-design random effects use `subj_int_sd`,
-#'   `subj_slope_sd`, `subj_corr`, `item_int_sd`, `item_slope_sd`, and
-#'   `item_corr`.
+#'   `n_subject`, `design_kind` (`"between"` or `"within"`), `include_items` and `n_item`
+#'   (read for a within design only), `factor_name`, `lev1`, `lev2`, `intercept`, `effect`,
+#'   `family`, `resp_name` (blank or `NULL` for the name [default_response_name()] gives) and
+#'   the family's parameters: `sigma` for the four continuous families, `shift` for
+#'   `"shifted_lognormal"`, `beta` for `"exgaussian"`, `phi` for `"beta"` and, for `"ordinal"`,
+#'   `thresholds` as a single comma-separated string such as `"-2, -0.6, 0.6, 2"`, as the
+#'   no-code app supplies it. Within-design random effects use `subj_int_sd`,
+#'   `subj_slope_sd`, `subj_corr`, `item_int_sd`, `item_slope_sd` and
+#'   `item_corr`. `counterbalance = TRUE` counterbalances the factor of a
+#'   within design with items, and is ignored in any other design.
+#' @details
+#' A response of the Gaussian, lognormal, shifted lognormal or ex-Gaussian family is rounded to
+#' four decimals, and a `beta` response is left unrounded. Rounding moves every proportion near 0
+#' or 1 onto the nearest value inside the interval at that many decimals. At four decimals, 9.8% of the
+#' 40,000 rows of a design with `phi = 0.8` landed on 0.0001 or 0.9999, and rows at such a bound
+#' dominate a Beta likelihood (see [brms_bridge()]). Unrounded, the data keep the distribution the
+#' specification describes. They can then differ between R and 'Python' in their last bits where
+#' the two do not share a maths library, as the cross-language vignette sets out.
+#'
+#' Counterbalanced lists show each subject each item at one level of the factor, rotating the
+#' levels over subjects and items as a Latin square does, so a design has half the rows of the
+#' fully crossed one. They set `counterbalance` on the factor, a field of specification version
+#' 0.4 described under Counterbalanced lists in the specification.
+#'
+#' The specification declares the lowest `spec_version` that reads it. Only counterbalanced lists
+#' need a version above 0.3, so the releases of either package that read 0.3 read every other
+#' design built here.
 #' @return A design specification as a nested list, ready for
-#'   [simulate_design()], [spec_json()], or the
+#'   [simulate_design()], [spec_json()] or the
 #'   power and precision functions.
 #' @examples
 #' build_spec(list(name = "demo", seed = 1, design_kind = "between",
@@ -50,18 +86,20 @@ build_spec <- function(p) {
                  contrasts = list(effect = c(-0.5, 0.5)))
   if (identical(p$design_kind, "within")) {
     factor$vary_within <- if (isTRUE(p$include_items)) c("subject", "item") else c("subject")
+    # Counterbalanced lists rotate the levels over items, so they need items. The apps hide the
+    # box without them, and a hidden box keeps its value, so it is read only where it applies.
+    if (isTRUE(p$include_items) && isTRUE(p$counterbalance)) factor$counterbalance <- TRUE
   } else {
     factor$between <- "subject"
   }
 
-  units <- list(subject = list(n = as.integer(p$n_subject)))
+  units <- list(subject = list(n = .as_count(p$n_subject)))
   if (identical(p$design_kind, "within") && isTRUE(p$include_items)) {
-    units$item <- list(n = as.integer(p$n_item))
+    units$item <- list(n = .as_count(p$n_item))
   }
 
   spec <- list(
-    spec_version = .SPEC_VERSION,
-    name = p$name, seed = as.integer(p$seed),
+    name = p$name, seed = .as_seed(p$seed),
     units = units,
     factors = list(factor),
     fixed = list(intercept = p$intercept, coefficients = list(effect = p$effect))
@@ -85,12 +123,20 @@ build_spec <- function(p) {
   }
 
   resp <- list(family = p$family, name = resp_name)
-  if (p$family %in% c("gaussian", "lognormal", "shifted_lognormal")) { resp$sigma <- p$sigma; resp$round <- 4L }
+  if (p$family %in% c("gaussian", "lognormal", "shifted_lognormal", "exgaussian")) {
+    resp$sigma <- p$sigma
+    resp$round <- 4L
+  }
   if (p$family == "shifted_lognormal") resp$shift <- p$shift
+  # The ex-Gaussian's exponential scale, which validate_spec() requires along with sigma.
+  if (p$family == "exgaussian") resp$beta <- p$beta
   if (p$family == "ordinal") resp$thresholds <- as.numeric(strsplit(gsub("\\s", "", p$thresholds), ",")[[1]])
   if (p$family == "beta") resp$phi <- p$phi
   spec$response <- resp
-  spec
+  # The lowest version that reads the specification, first, where spec_json() has always written
+  # it. Stamping .SPEC_VERSION would make every specification the apps export unreadable by the
+  # releases that read 0.3, although only counterbalanced lists need 0.4.
+  c(list(spec_version = .required_spec_version(spec)), spec)
 }
 
 # Fields that stay JSON arrays even when they hold a single value. Everything else of length
@@ -100,8 +146,9 @@ build_spec <- function(p) {
 # round-trip through load_spec().
 .spec_array_fields <- c("levels", "vary_within", "thresholds")
 
-# Fields that are JSON objects, so that an empty one emits `{}` rather than `[]`. R cannot tell
-# an empty named list from an empty unnamed one, and `"random": []` fails the schema.
+# Fields that are JSON objects, so that an empty one emits `{}` rather than `[]`. jsonlite writes
+# an empty list as `{}` only when it carries names, and one made with list() carries none, while
+# `"random": []` fails the schema.
 .spec_object_fields <- c("units", "subject", "item", "contrasts", "fixed", "coefficients",
                          "random", "slopes", "correlations", "response")
 
@@ -124,25 +171,114 @@ build_spec <- function(p) {
   jsonlite::unbox(x)
 }
 
-# The shortest decimal string that reads back as exactly this double, or NULL for a
-# non-finite value. Fifteen significant digits is enough for most numbers a user types, and
-# seventeen is enough for every double, so trying the shorter widths first and falling back to
-# seventeen gives both exactness and readability.
+# The shortest decimal string that `reader` reads back as exactly this double, or NULL. Fifteen
+# significant digits is enough for most numbers a user types, and seventeen is enough for every
+# double under a reader that rounds correctly, so trying the shorter widths first gives both
+# exactness and readability. NULL means a value that is not finite, or, for reader = "r", one
+# whose fifteen- and sixteen-digit forms some build of R might read as a different double.
 #
-# The seventeen-digit form is returned without being checked, because on a build of R without
-# long-double arithmetic the check would reject the one form that is certainly right. There
-# `as.numeric()` accumulates the mantissa in a double before applying the decimal exponent, and
-# seventeen digits overflow the 53-bit mantissa on the way, so "0.33333333333333331" reads back
-# one unit in the last place below 1/3. Fifteen and sixteen digits stay within the mantissa and
-# are correctly rounded everywhere, which is also why they are tried first: the shorter form is
-# both the readable one and the one that survives a reader built without long doubles.
-.shortest_double <- function(z) {
+# reader = "json" serves spec_json(). Its document is read by jsonlite in load_spec() and by
+# Python's json, and both round correctly, so each candidate is checked with jsonlite itself.
+# as.numeric() will not do as the check. On a build with long-double arithmetic, which includes
+# R on x86 Windows and Linux, it rounds a decimal twice, first to long double and then to double.
+# It reads "-8.46847779583186" as -0x1.0efdc5258p+3, for one, where jsonlite reads its
+# neighbour, -0x1.0efdc52580001p+3. Checking with it put about one number in 5,000 to 7,000 a
+# unit in the last place away from the value R held. Seventeen digits always round-trip under
+# correct rounding, so that width needs no check.
+#
+# reader = "r" serves numbers written as R source, which R's parser reads with the routine
+# as.numeric() uses. A candidate must also pass .r_reads_back(), and nothing at seventeen digits
+# can, because those digits exceed 2^53.
+.shortest_double <- function(z, reader = c("json", "r")) {
+  reader <- match.arg(reader)
   if (!is.finite(z)) return(NULL)
   for (d in 15:16) {
     s <- sprintf(paste0("%.", d, "g"), z)
-    if (as.numeric(s) == z) return(s)
+    if (.json_reads_back(s, z) && (reader == "json" || .r_reads_back(s, z))) return(s)
   }
-  sprintf("%.17g", z)
+  if (reader == "json") sprintf("%.17g", z) else NULL
+}
+
+# Whether jsonlite, the reader of load_spec(), reads the decimal `s` as exactly the double `z`.
+# jsonlite parses a number with the C library's strtod(), which rounds correctly, as Python's
+# float() does.
+.json_reads_back <- function(s, z) isTRUE(jsonlite::fromJSON(s) == z)
+
+# Whether R's parser reads the decimal `s` as exactly the double `z` on every build, given that a
+# correctly rounded reader does. R reads a decimal with R_strtod5() (src/main/util.c), which
+# accumulates the digits as an integer, divides or multiplies it once by a power of ten built by
+# repeated squaring, and converts the result to double.
+#
+# Without long doubles, that is a single rounding, and so a correct one, provided the integer
+# stays within 2^53 and the power of ten within 10^22, the largest that is exact. With long
+# doubles, the result is first rounded to the long double's significand, 64 bits on x86 and 113
+# where long double has quadruple precision, and then to the double's 53. The second rounding
+# goes astray only when the first lands exactly halfway between two doubles. The exact result
+# is therefore worked out here, and the decimal is refused when it lies within one unit of a
+# 64-bit significand of the midpoint. That is twice as far as a 64-bit rounding can move it.
+#
+# A decimal with k digits after the point lies a multiple of 1/5^k of the spacing of doubles
+# from the double below it. Since 5^k is odd, it lies at least 1/(2 * 5^k) of that spacing from
+# a midpoint, which for k = 4 is 1.6 units of a 64-bit significand. A value typed with up to
+# four decimal places, such as 0.05 or 1.01, is therefore never refused. Of the 15- and 16-digit
+# decimals that the other conditions admit, the margin refuses about one in 1,400. The check
+# against as.numeric() confirms the outcome on the build writing the script.
+.r_reads_back <- function(s, z) {
+  if (!isTRUE(as.numeric(s) == z)) return(FALSE)
+  if (z == 0) return(TRUE)
+  t <- sub("^-", "", s)
+  expn <- 0L
+  if (grepl("e", t, fixed = TRUE)) {
+    expn <- as.integer(sub("^.*e", "", t))
+    t <- sub("e.*$", "", t)
+  }
+  if (grepl(".", t, fixed = TRUE)) expn <- expn - nchar(sub("^.*[.]", "", t))
+  digits <- sub("^0+", "", sub(".", "", t, fixed = TRUE))
+  # At most 2^53 = 9007199254740992, compared in two halves that every build reads exactly.
+  n <- nchar(digits)
+  if (n > 16L) return(FALSE)
+  if (n == 16L) {
+    hi <- as.numeric(substr(digits, 1L, 8L))
+    if (hi > 90071992 || (hi == 90071992 && as.numeric(substr(digits, 9L, 16L)) > 54740992))
+      return(FALSE)
+  }
+  if (abs(expn) > 22L) return(FALSE)
+
+  m <- as.numeric(digits)
+  p10 <- 1
+  for (i in seq_len(abs(expn))) p10 <- p10 * 10
+  a <- abs(z)
+  # r = q - a, where q is the exact quotient or product, to far more than 64 bits.
+  r <- if (expn < 0L) {
+    ap <- .two_prod(a, p10)
+    ((m - ap[1L]) - ap[2L]) / p10
+  } else {
+    mp <- .two_prod(m, p10)
+    (mp[1L] - a) + mp[2L]
+  }
+  # q lies in [2^e, 2^(e + 1)), where doubles are 2^(e - 52) apart and the units of a 64-bit
+  # significand 2^(e - 63). That is a's range, except when q lies just below a power of two.
+  e <- floor(log2(a))
+  if (2^e > a) e <- e - 1
+  if (2^(e + 1) <= a) e <- e + 1
+  if (r < 0 && a == 2^e) e <- e - 1
+  # The midpoint on q's side lies half a spacing from a. A 64-bit rounding reaches it from within
+  # half a unit, 2^(e - 64). The margin is twice that, and the error in r is far smaller still.
+  abs(abs(r) - 2^(e - 53)) > 2^(e - 63)
+}
+
+# The product a * b as an unevaluated sum of two doubles, exactly: Dekker's (1971) algorithm,
+# as Ogita, Rump and Oishi (2005) write it. Veltkamp's split, through the factor 2^27 + 1, cuts
+# each factor into two halves whose pairwise products are exact.
+.two_prod <- function(a, b) {
+  p <- a * b
+  ca <- 134217729 * a
+  a1 <- ca - (ca - a)
+  a2 <- a - a1
+  cb <- 134217729 * b
+  b1 <- cb - (cb - b)
+  b2 <- b - b1
+  c(p, a2 * b2 - (((p - a1 * b1) - a2 * b1) - a1 * b2))
 }
 
 # The wrapper that carries an already-formatted number through jsonlite as a string.
@@ -166,10 +302,10 @@ build_spec <- function(p) {
 # exactly but read badly: an effect the user typed as 0.3 would be written 0.29999999999999999,
 # which in an exported specification looks like a defect. Formatting each double here, rather
 # than shortening jsonlite's output afterwards, keeps the readability without ever reading a
-# number back from the text it was just written to. That read-back was wrong on a build of R
+# number back from the text it was just written to. A read-back would be wrong on a build of R
 # without long-double arithmetic, where `as.numeric("0.33333333333333331")` is one unit in the
-# last place below 1/3: the shortened form then recorded that wrong value, and the
-# specification no longer held the coefficient the user set.
+# last place below 1/3: the shortened form would record that wrong value, and the
+# specification would no longer hold the coefficient the user set.
 #
 # Integers are left to jsonlite, which writes them exactly. So is any vector holding NA, NaN or
 # an infinity, which has no decimal form to shorten and which jsonlite already renders.
@@ -201,10 +337,13 @@ build_spec <- function(p) {
 #' Writing every number at 17 instead would round-trip but read badly, turning an effect
 #' typed as 0.3 into `0.29999999999999999`.
 #'
-#' Preferring the shorter width is not only a matter of appearance. A build of R without
-#' long-double arithmetic reads 17 significant digits inexactly, because the digits overflow
-#' the 53-bit mantissa before the decimal exponent is applied, so the few values that need
-#' that width are the ones such a build cannot recover. Anything shorter it reads correctly.
+#' A width is accepted only when 'jsonlite' reads it back as exactly the double it was written
+#' from. [load_spec()] reads the file with 'jsonlite', which parses numbers with the C library's
+#' `strtod()`, and the 'Python' package reads it with `json`. Both round correctly, so the two
+#' packages recover the same double. R's `as.numeric()` would not do as that check: on a build
+#' with long-double arithmetic, such as R on x86 Windows and Linux, it rounds a decimal twice,
+#' first to long double and then to double, and accepts some 15- and 16-digit forms that the
+#' readers of the file put one unit in the last place away.
 #'
 #' @param spec A design specification (list), as produced by [build_spec()].
 #' @return A length-one character string containing the specification as pretty-printed JSON,
@@ -223,13 +362,27 @@ spec_json <- function(spec) {
     tag)
 }
 
-# A double as an R source literal that parses back to the same bit pattern. deparse() prints
-# 15 significant digits, so deparse(1/3) reads back as a different double.
+# A double as R source that evaluates to the same bit pattern on every build. deparse() prints
+# 15 significant digits, so deparse(1/3) reads back as a different double. A plain decimal is
+# written where R's parser reads one exactly on every build, as it does any value typed with up
+# to four decimal places. Any other number, a fitted value needing 17 digits for instance, is
+# written as a call that has jsonlite read its decimal, since jsonlite rounds correctly on every
+# build.
 .num_literal <- function(z) {
   if (is.na(z)) return("NA_real_")
-  short <- .shortest_double(z)
-  if (is.null(short)) return(if (z > 0) "Inf" else "-Inf")
-  short
+  if (!is.finite(z)) return(if (z > 0) "Inf" else "-Inf")
+  short <- .shortest_double(z, "r")
+  if (!is.null(short)) return(short)
+  sprintf("jsonlite::fromJSON(\"%s\")", .shortest_double(z))
+}
+
+# Text as an R raw string, which the parser takes character for character, quotation marks and
+# backslashes included (R >= 4.0.0). Dashes are added to the delimiter until its closing form, a
+# parenthesis, the dashes and a quotation mark, occurs nowhere in the text.
+.r_raw_string <- function(txt) {
+  dashes <- ""
+  while (grepl(paste0(")", dashes, "\""), txt, fixed = TRUE)) dashes <- paste0(dashes, "-")
+  paste0("r\"", dashes, "(\n", txt, "\n)", dashes, "\"")
 }
 
 # Backtick-quote a list name unless it is already a syntactic R name. Coefficient and
@@ -238,8 +391,8 @@ spec_json <- function(spec) {
   if (grepl("^[A-Za-z.][A-Za-z0-9._]*$", n) && !grepl("^\\.[0-9]", n)) n else paste0("`", n, "`")
 }
 
-# The specification as an R expression, built term by term so that every number keeps full
-# precision. deparse() on the whole list would be shorter but silently rounds the numbers.
+# An R value as an R expression, built term by term so that every number goes through
+# .num_literal(). deparse() would be shorter but silently rounds the numbers.
 .r_literal <- function(x) {
   if (is.null(x)) return("NULL")
   if (is.list(x)) {
@@ -259,21 +412,37 @@ spec_json <- function(spec) {
 
 #' Generate a self-contained, reproducible R script from a specification
 #'
-#' Embed the specification as an R list literal, so that the returned script reproduces the
-#' design without any external file. This turns a design built in the no-code application into
-#' a reproducible script; the application's Verify button runs that script in a clean R session
-#' and confirms that it reproduces the data bit-for-bit.
+#' Embed the specification as the JSON text that [spec_json()] writes, so that the returned
+#' script reproduces the design without any external file. This turns a design built in the
+#' no-code application into a reproducible script. The application's Verify button runs that
+#' script in a clean R session and checks that its data are identical, bit for bit, to the data
+#' the application's current specification produces.
 #'
 #' @details
-#' Numbers are emitted at the shortest width that reads back as the same double, rather than
-#' through `deparse()`, which prints 15 significant digits and so does not round-trip:
-#' `deparse(1/3)` reads back as a different double. Since the point of the script is
-#' bit-for-bit reproduction, the embedded specification has to preserve every coefficient
-#' exactly.
+#' The script ends with a commented suggestion of the analysis that fits the design. A two-group
+#' Gaussian design with one row per subject is sent to [power_design()], whose t-test takes no
+#' other. An `ordinal` or `beta` outcome is sent to [generate_design_analysis()], which writes a
+#' Bayesian design analysis on the link scale to `design_analysis.R`, since [power_mixed()] fits
+#' such an outcome only on the response scale. Running that file needs `brms` and a working Stan
+#' backend, which the installation line does not name. Any other design is sent to
+#' [power_mixed()], and only then does the installation line name `lme4` and `lmerTest`, which it
+#' needs.
 #'
-#' @param spec A design specification (list), as produced by [build_spec()].
+#' Since the script is meant to reproduce the data bit for bit, the embedded specification has to
+#' preserve every coefficient exactly. The JSON text sits in a raw string that [load_spec()]
+#' reads with 'jsonlite', which parses numbers with the C library's `strtod()`. That rounds
+#' correctly, so each number reaches the script as the double it was on every build of R, and
+#' the numbers stay as readable as in the specification file. Written as R literals, they would
+#' be left to R's own parser. On a build without long-double arithmetic, such as R on Apple
+#' silicon, that parser can read a 17-digit decimal one unit in the last place away. `deparse()`
+#' is no alternative either, since it prints 15 significant digits and `deparse(1/3)` reads back
+#' as a different double.
+#'
+#' @param spec A design specification (list), as produced by [build_spec()], or the path of a
+#'   specification file for [load_spec()] to read.
 #' @return A length-one character string containing a runnable R script that loads `pilotr`,
-#'   embeds the specification, and simulates the data.
+#'   embeds the specification and simulates the data, with the installation line and the
+#'   suggested analysis as comments.
 #' @examples
 #' spec <- build_spec(list(name = "demo", seed = 1, design_kind = "between",
 #'   factor_name = "group", lev1 = "a", lev2 = "b", n_subject = 20,
@@ -281,13 +450,48 @@ spec_json <- function(spec) {
 #' cat(generate_r_script(spec))
 #' @export
 generate_r_script <- function(spec) {
+  # A path is read first, so that the script embeds the specification rather than the path and
+  # runs anywhere, and the closing suggestion is chosen from the design the file holds.
+  if (is.character(spec) && length(spec) == 1L) spec <- load_spec(spec)
+  if (!is.list(spec))
+    stop("`spec` must be a specification list or the path of a specification file",
+         call. = FALSE)
+  hint <- .script_hint(spec)
   paste0(
     "# Reproducible simulation exported by pilotr.\n",
-    "# install.packages(\"pilotr\")   # once available; then run this script as-is.\n",
+    hint[["install"]],
     "library(pilotr)\n\n",
-    "spec <- ", .r_literal(spec), "\n\n",
+    "# The specification as spec_json() writes it. load_spec() reads it with jsonlite, which\n",
+    "# recovers every number exactly on every build of R.\n",
+    "spec <- load_spec(", .r_raw_string(spec_json(spec)), ")\n\n",
     "data <- simulate_design(spec)              # analysis-ready data frame\n",
     "# write.csv(data, \"data.csv\", row.names = FALSE)\n",
-    "# pow  <- power_mixed(spec, n_sims = 200)   # simulation-based power + Type S/M\n"
+    hint[["analysis"]]
   )
+}
+
+# The installation line and the closing suggestion of an exported script, both chosen by the
+# design. power_design() takes the two-group Gaussian design with one row per subject, by its own
+# rule. power_mixed() fits an ordinal or Beta outcome only on the response scale, while the
+# specification's coefficients are on the logit scale. Those outcomes therefore get the Bayesian
+# design analysis, written to a file with the first coefficient as the focal effect, as both apps'
+# power tabs suggest. Called without a file, it returns the analysis as a string, and a script run
+# with Rscript or source() discards that. Every other design gets power_mixed(), and the
+# installation line then names lme4 and lmerTest.
+.script_hint <- function(spec) {
+  cran <- "# install.packages(\"pilotr\")   # from CRAN\n"
+  if (is.null(.two_group_refusal(spec)))
+    return(list(
+      install = cran,
+      analysis = "# pow <- power_design(spec, n_sims = 1000)   # power with Type S and Type M\n"))
+  if (isTRUE(spec[["response"]][["family"]] %in% c("ordinal", "beta"))) {
+    focal <- names(spec[["fixed"]][["coefficients"]])
+    focal <- if (length(focal)) encodeString(focal[1L], quote = "\"") else "..."
+    return(list(install = cran, analysis = sprintf(paste0(
+      "# generate_design_analysis(spec, focal = %s, file = \"design_analysis.R\")   ",
+      "# Bayesian design analysis on the link scale\n"), focal)))
+  }
+  list(install = paste0("# install.packages(c(\"pilotr\", \"lme4\", \"lmerTest\"))   # from CRAN; ",
+                        "lme4 and lmerTest only for power_mixed()\n"),
+       analysis = "# pow <- power_mixed(spec, n_sims = 200)   # needs lme4 and lmerTest\n")
 }

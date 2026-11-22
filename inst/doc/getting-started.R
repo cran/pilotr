@@ -31,7 +31,7 @@ nrow(data)
 head(data)
 
 ## -----------------------------------------------------------------------------
-isTRUE(all.equal(simulate_design(spec), simulate_design(spec)))
+identical(simulate_design(spec), simulate_design(spec))
 
 ## -----------------------------------------------------------------------------
 cat(generate_r_script(spec))

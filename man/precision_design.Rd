@@ -11,7 +11,9 @@ precision_design(
   prep = NULL,
   rope = 0.05,
   n_sims = 100,
-  workers = 1
+  workers = 1,
+  cl = NULL,
+  fallback = c("singular", "warning")
 )
 }
 \arguments{
@@ -20,66 +22,121 @@ precision_design(
 \item{focal}{The focal effects. \code{NULL}, the default, analyses every coefficient in the
 specification and takes the true values from it. A named numeric vector maps coefficient names
 to their true values, and a character vector names them without their true values. Interaction
-effects follow the model's column naming, so a specification key \code{a:b} is the focal name \code{a_b}.}
+effects follow the model's column naming, so a specification key \code{a:b} is the focal name \code{a_b}.
+A list of coefficient sets, which \code{\link[=power_mixed]{power_mixed()}} tests jointly, is refused, since a set has no
+single estimate to build an interval around.}
 
-\item{formula}{Optional \code{lme4} formula; if \code{NULL} it is derived from the specification via
-\code{\link[=model_formula]{model_formula()}}.}
+\item{formula}{Optional \code{lme4} formula. If \code{NULL}, it is derived from the specification by
+\code{\link[=model_formula]{model_formula()}}, and the response family chooses the fitter. A formula given here is
+fitted as a linear model whatever the family (see Details). A ladder of models simulates a
+simplification rule: a character vector of \code{\link[=model_formula]{model_formula()}} structures, such as
+\code{c("maximal", "zcp", "intercepts")}, fitted as the derived model is, or a list of formulas,
+fitted as written, as in \code{\link[=power_mixed]{power_mixed()}}.}
 
-\item{prep}{Optional function mapping a simulated data set to the modelling data; if \code{NULL}
-it is derived via \code{\link[=model_data]{model_data()}}, which log-transforms the outcome and
-builds the contrast and interaction columns, so focal names follow the
+\item{prep}{Optional function mapping a simulated data set to the modelling data. If \code{NULL}, it
+is derived by \code{\link[=model_data]{model_data()}}, which adds the analysis response \code{.y}, on the log scale for the
+lognormal families, and builds the contrast and interaction columns, so focal names follow the
 auto-formula (interactions written as \code{a_b}).}
 
-\item{rope}{Half-width of the region of practical equivalence; an effect with
-\code{abs(beta) < rope} is treated as practically equivalent to zero. Set it clearly narrower
-than the smallest effect worth detecting, because the probability of a determinate
-meaningful decision about an effect no larger than \code{rope} cannot rise above 0.5 however
+\item{rope}{The region of practical equivalence, as a half-width or as an interval. A single
+non-negative number \code{r} is the region from \code{-r} to \code{r}, so that an effect with
+\code{abs(beta) < r} is treated as practically equivalent to zero. A pair \code{c(lower, upper)} with
+\code{lower < upper} is the region between those bounds, which need not be centred on zero, as
+for a prediction that an effect lies within a stated interval. Any other value is refused.
+Keep the effects worth detecting clearly outside the region, because the probability of a
+determinate meaningful decision about an effect inside it cannot rise above 0.5 however
 large the sample.}
 
 \item{n_sims}{Number of Monte Carlo replicates. \code{p_meaningful} and \code{p_equivalent} are
-proportions over the converged replicates, so they carry a Monte Carlo standard error of
-about \code{sqrt(p * (1 - p) / n_sims)} and move in coarse steps when \code{n_sims} is small. At
-least 200 replicates are advisable for real planning.}
+proportions over the replicates that returned an estimate (\code{n_returned}), so they carry
+a Monte Carlo standard error of about \code{sqrt(p * (1 - p) / n_sims)} and move in coarse
+steps when \code{n_sims} is small. At least 200 replicates are advisable for real planning.}
 
 \item{workers}{Number of local worker processes over which to spread the replicates.
 The default of 1 runs serially. Because every replicate takes its own seed from
 \code{\link[=replicate_seeds]{replicate_seeds()}}, any worker count returns results identical to a serial run.}
+
+\item{cl}{A cluster made by \code{\link[parallel:makeCluster]{parallel::makeCluster()}} to run the replicates on, in place of one
+started for this call, in which case \code{workers} is ignored. The cluster is left running for its
+owner to stop, and through \code{\link[=sweep_spec]{sweep_spec()}} one cluster serves every grid point.}
+
+\item{fallback}{When a replicate moves on to the next rung of a ladder: \code{"singular"}, the
+default, after a fit that is boundary-singular or failed, and \code{"warning"} also after a fit with
+a warning or an optimiser convergence message. It has no effect on a single formula.}
 }
 \value{
 A data frame with one row per focal effect and columns \code{param}, \code{true},
 \code{mean_ci_width}, \code{p_meaningful}, \code{p_meaningful_mcse}, \code{p_meaningful_lo},
 \code{p_meaningful_hi}, \code{p_equivalent}, \code{p_equivalent_mcse}, \code{p_equivalent_lo},
-\code{p_equivalent_hi}, \code{n_attempted}, \code{n_returned}, \code{n_converged}, \code{n_singular}, and
-\code{n_warning}. Each decision proportion is reported with its Monte Carlo standard
+\code{p_equivalent_hi}, \code{n_attempted}, \code{n_returned}, \code{n_converged}, \code{n_singular},
+\code{n_warning} and \code{fitter}. Each decision proportion is reported with its Monte Carlo standard
 error (\verb{*_mcse}) and Wilson interval bounds (\verb{*_lo}, \verb{*_hi}), because a proportion
 over a finite number of replicates is an estimate rather than a fact. The interval
 behind \code{mean_ci_width} and the ROPE decisions is the Wald approximation described in
-Details.
+Details. \code{fitter} names the fitter and the interval, such as
+\code{"lme4::glmer (binomial), Wald z"}. For an \code{ordinal} or \code{beta} response fitted on its own
+scale, the decision columns are \code{NA} (see Details).
 
 The decision proportions are taken over \code{n_returned}, the replicates that
 produced an estimate. The remaining counts separate the fit outcomes, because a
 fit can return a usable estimate while still being boundary-singular or
-carrying a convergence warning: \code{n_converged} counts replicates with neither,
-\code{n_singular} those where \code{lme4::isSingular()} was true, and \code{n_warning} those
-with a warning or optimiser convergence message. Singular and warning fits are
+carrying a convergence warning: \code{n_converged} counts replicates with neither, \code{n_singular}
+those where \code{lme4::isSingular()} was true and \code{n_warning} those with a warning or optimiser
+convergence message other than lme4's singular-fit notice, which \code{n_singular} already counts.
+Singular and warning fits are
 retained, since their fixed-effect estimates remain interpretable and
 discarding them would bias the result. A large \code{n_singular} means the model
 being fitted is richer than the design can support at that sample size, which
 is common in crossed designs (Bates et al., 2015; Matuschek et al., 2017).
+
+A ladder adds one column per rung, \verb{rung_<name>}, holding the share of the replicates
+analysed at that rung, the same on every row. The shares sum to 1, and a replicate in which no
+rung's fit met the rule counts at the last rung. The fit counts then describe the fit each
+replicate kept.
 }
 \description{
 A fast frequentist analogue of a Bayesian highest-density-interval-versus-ROPE design
 analysis. Across Monte Carlo replicates, fit the model and record, for each focal fixed
 effect, whether its 95\% confidence interval falls entirely outside a region of practical
-equivalence (a practically meaningful effect) or entirely inside it (practical equivalence
-to zero), along with the expected interval width. Requires the \code{lme4} package.
+equivalence (a practically meaningful effect) or entirely inside it (practical equivalence),
+along with the expected interval width. Requires the \code{lme4} package.
 }
 \details{
 The interval is a Wald approximation: the estimate plus or minus 1.96 standard errors
-from the model's variance-covariance matrix. This fixed-z interval is chosen for speed and
-for comparability across replicates; in small samples it is somewhat narrower than a
-Satterthwaite t interval, so \code{p_meaningful} and \code{mean_ci_width} are slightly optimistic
-at small sample sizes.
+from the model's variance-covariance matrix. This fixed-z interval is chosen for speed and for
+comparability across replicates. In small samples, it is somewhat narrower than a Satterthwaite t
+interval, so \code{p_meaningful} and \code{mean_ci_width} are slightly optimistic at small sample sizes.
+
+The fitter follows the response family, as in \code{\link[=power_mixed]{power_mixed()}}. Since no p-value is needed, a
+\code{gaussian}, \code{lognormal}, \code{shifted_lognormal} or \code{exgaussian} response is fitted by
+\code{lme4::lmer()}. A \code{bernoulli} or \code{poisson} response is fitted by \code{lme4::glmer()} with the
+binomial or Poisson family, and a model with no random terms by \code{stats::lm()} or
+\code{stats::glm()}. The interval is therefore on the scale of the specification's coefficients,
+and so is the region of practical equivalence that \code{rope} sets. That is the log scale for the
+lognormal families and \code{poisson}, and the logit scale for \code{bernoulli}. A \code{glmer()} fit has the
+Wald interval that Bolker et al. (2009) recommend for a GLMM without overdispersion. With few
+subjects or items, it is likewise narrower than it should be, since the test it inverts rejects
+too often when the clusters are few (Li and Redden, 2015). The \code{fitter} column names the
+fitter.
+
+pilotr has no frequentist model on the logit scale for an \code{ordinal} or \code{beta} response.
+Such a response is fitted by the linear model on its own scale, where a region of practical
+equivalence set on the logit scale of the coefficients means nothing. The function warns, and
+withholds the decision probabilities with their Monte Carlo standard errors and bounds (\code{NA}).
+\code{mean_ci_width} stays, as the width of an interval on the response scale.
+\code{\link[=generate_design_analysis]{generate_design_analysis()}} applies an interval-and-ROPE rule on the link scale, in a
+Bayesian model.
+
+A \code{formula} given here is fitted as written, by \code{lme4::lmer()}, or by \code{stats::lm()} when it
+has no random terms, whatever the family. With such a formula, or a \code{prep} that changes the
+response, and \code{focal = NULL}, the true values still come from the specification and are on its
+scale, which need not be the model's. A named numeric \code{focal} gives the true values on the
+model's scale.
+
+\code{formula} given as a ladder of models simulates a preregistered simplification rule, as in
+\code{\link[=power_mixed]{power_mixed()}}. Each replicate fits the rungs in turn and keeps the first fit that \code{fallback}
+accepts, or the last rung's fit when it accepts none. The intervals and decisions are then those
+of the rule, and one column per rung gives the share of the replicates analysed at it.
 }
 \examples{
 \donttest{
@@ -102,4 +159,14 @@ models. \emph{arXiv}. \doi{10.48550/arXiv.1506.04967}
 Matuschek, H., Kliegl, R., Vasishth, S., Baayen, H. and Bates, D. (2017). Balancing
 Type I error and power in linear mixed models. \emph{Journal of Memory and Language},
 94, 305-315. \doi{10.1016/j.jml.2017.01.001}
+
+Bolker, B. M., Brooks, M. E., Clark, C. J., Geange, S. W., Poulsen, J. R., Stevens, M. H. H.
+and White, J.-S. S. (2009). Generalized linear mixed models: A practical guide for ecology
+and evolution. \emph{Trends in Ecology & Evolution}, 24(3), 127-135.
+\doi{10.1016/j.tree.2008.10.008}
+
+Li, P. and Redden, D. T. (2015). Comparing denominator degrees of freedom approximations for
+the generalized linear mixed model in analyzing binary outcome in small sample
+cluster-randomized trials. \emph{BMC Medical Research Methodology}, 15, 38.
+\doi{10.1186/s12874-015-0026-x}
 }

@@ -18,10 +18,13 @@ generate_design_analysis(
 \item{spec}{A design specification (path or list).}
 
 \item{focal}{A character vector of focal coefficient names, or a named numeric vector mapping
-those names to their true values. The names are the coefficients of the emitted model, so an
-interaction is written \code{a:b} as in the specification, not \code{a_b} as in the \code{lme4} formula
-from \code{\link[=model_formula]{model_formula()}}. A name that is not a fixed coefficient of the design is reported as
-a warning here, well before the emitted script would fail on it.}
+those names to their true values. The names are the specification's coefficients, so an
+interaction is written \code{a:b}, not \code{a_b} as in the \code{lme4} formula from \code{\link[=model_formula]{model_formula()}},
+with its parts in either order. The script refers to each effect by the name brms gives it,
+which for an interaction lists the parts in the order they first appear in the formula, so
+\code{cond:age} reaches the script as \code{age:cond} when the specification lists \code{age} first. A
+name that is not a fixed coefficient of the design is reported as a warning here, well
+before the emitted script would fail on it.}
 
 \item{rule}{The decision rule, a named list with elements \code{bf} (the Bayes-factor threshold,
 applied in both directions), \code{rope} (the half-width of the region of practical equivalence,
@@ -40,27 +43,30 @@ post-warmup draws ending in a divergent transition). A missing element takes its
 array wrapper that runs one replicate per task and an aggregator that combines the
 per-task results. The three parts are separated by \verb{# ===== FILE n of 3} banners and are
 meant to be split into three files, since the middle part is shell and so is not valid R.
-The wrapper is written for a generic SLURM cluster and carries two placeholders, marked
-\code{EDIT} in its header, that must be filled in before submission: the \verb{#SBATCH --account}
-directive and the writable \code{PROJECT_DIR}. It runs the \code{design_analysis.R} saved next to
-it, so submit from the directory the parts were saved into.}
+The wrapper carries two placeholders, marked \code{EDIT} in its header, that must be filled in
+before submission: the \verb{#SBATCH --account} directive and the writable \code{PROJECT_DIR}. The
+partitions it names, \code{short} in an \verb{#SBATCH --partition} directive and \code{devel} in the
+smoke-test command, are cluster-specific, and its header lists them with the placeholders
+as settings to check and edit. It runs the \code{design_analysis.R} saved next to it, so submit
+from the directory the parts were saved into.}
 
 \item{file}{Optional path. When given, the script is also written there, byte for byte
 with LF line endings and a single trailing newline on every platform, and returned
 invisibly.}
 }
 \value{
-A length-one character string holding the emitted script, invisibly when \code{file} is
-given. For \code{array = "slurm"} the string holds three banner-separated parts, an R analysis
-script, a bash array wrapper, and an R aggregator; the wrapper is not submittable as
-emitted, since its \code{--account} and \code{PROJECT_DIR} placeholders must be filled in first.
+A length-one character string holding the emitted script, invisibly when \code{file} is given.
+For \code{array = "slurm"}, the string holds three banner-separated parts: an R analysis script, a
+bash array wrapper and an R aggregator. The wrapper cannot be submitted as emitted, since its
+\code{--account} and \code{PROJECT_DIR} placeholders must be filled in first and its partitions checked
+against the cluster's.
 }
 \description{
 Emit a runnable R script that simulates from a design specification, fits the confirmatory
-Bayesian model that \code{\link[=brms_bridge]{brms_bridge()}} derives for it, and decides about each focal effect on a
-Savage-Dickey Bayes factor together with a highest-density interval tested against a region
-of practical equivalence. The script is returned as a character string and nothing is fitted
-here, so the function needs neither \code{brms} nor Stan installed.
+Bayesian model that \code{\link[=brms_bridge]{brms_bridge()}} derives for it and decides about each focal effect on a
+Savage-Dickey Bayes factor together with a highest-density interval tested against a region of
+practical equivalence. The script is returned as a character string and nothing is fitted here,
+so the function needs neither \code{brms} nor Stan installed.
 }
 \details{
 The function emits a script for the user to run, for two reasons that both come down to
@@ -80,23 +86,28 @@ density at zero (Wagenmakers et al., 2010). The interval against a region of pra
 equivalence asks instead whether the effect is large enough to matter (Kruschke, 2018).
 Requiring the two to agree makes \code{"supported"} and \code{"null"} harder to reach than either
 criterion alone would, and it leaves the third answer of \code{"inconclusive"} available when they
-disagree, which is the answer a small pilot most often deserves.
+disagree, which is the answer most small pilots warrant.
 
 Because the Savage-Dickey ratio is read off the prior as well as the posterior, the emitted
 \code{brm()} call sets \code{sample_prior = "yes"}, and the Bayes factor it produces is a statement
 about the prior that \code{\link[=brms_bridge]{brms_bridge()}} supplies as much as about the data. Widening that prior
-moves the factor towards the null.
+moves the factor towards the null. The prior is the bridge's at its defaults. For the
+continuous families, a coefficient's prior has a standard deviation of 0.5 standard
+deviations of the response per standard deviation of the coefficient's column, and 0.25 for
+an interaction. For the link families, it is 0.5 and 0.25 on the link scale, per unit of the
+coefficient's column. Bayes factors depend on these widths (Kass and Raftery, 1995), so they
+belong in any report of the design analysis.
 
 The convergence gate is checked before any verdict is formed. R-hat is the rank-normalised
 version of Vehtari et al. (2021), for which a limit near 1.01 is appropriate where the older
 one was 1.1, and divergent transitions are counted as a share of post-warmup draws so that the
-threshold means the same thing whatever the run length. When either limit is exceeded the
-emitted script reports \code{NA} for every verdict and prints why, since a conclusion from a fit
-that has not converged carries the authority of a number without the sampling behind it.
+threshold means the same thing whatever the run length. When either limit is exceeded, the
+emitted script reports \code{NA} for every verdict and prints why, since a fit that has not converged
+cannot support a conclusion.
 
-A verdict is a function of the whole rule, the whole gate and the specification, so each
-replicate's record carries all of them: \code{bf_threshold}, \code{rope}, \code{ci_mass}, \code{max_rhat_limit},
-\code{max_divergent_limit}, an MD5 fingerprint of the canonical specification JSON, and the pilotr
+A verdict is a function of the whole rule, the whole gate and the specification, so the record
+of each replicate carries all of them: \code{bf_threshold}, \code{rope}, \code{ci_mass}, \code{max_rhat_limit},
+\code{max_divergent_limit}, an MD5 fingerprint of the canonical specification JSON and the pilotr
 version that produced the data. A results directory collects whatever was written into it, and
 the emitted aggregator globs it, so without those columns two array runs under different
 regions of practical equivalence would combine into one table with nothing to tell them apart.
@@ -107,7 +118,7 @@ The aggregator stops when they disagree, and pools nothing.
 # browser build of the no-code app.
 spec   <- load_spec(pilotr_example("crossed_mixed_rt"))
 script <- generate_design_analysis(spec, focal = c(cond = 0.05))
-cat(head(strsplit(script, "\n")[[1]], 15), sep = "\n")
+cat(head(strsplit(script, "\n")[[1]], 18), sep = "\n")
 
 # A stricter rule, with a wrapper for a SLURM array and its aggregator.
 cluster <- generate_design_analysis(spec, focal = c(cond = 0.05),
@@ -123,7 +134,7 @@ Kruschke, J. K. (2018). Rejecting or accepting parameter values in Bayesian esti
 \emph{Advances in Methods and Practices in Psychological Science}, 1(2), 270-280.
 \doi{10.1177/2515245918771304}
 
-Vehtari, A., Gelman, A., Simpson, D., Carpenter, B. and Burkner, P.-C. (2021).
+Vehtari, A., Gelman, A., Simpson, D., Carpenter, B. and \enc{Bürkner}{Burkner}, P.-C. (2021).
 Rank-normalization, folding, and localization: An improved R-hat for assessing convergence
 of MCMC. \emph{Bayesian Analysis}, 16(2), 667-718. \doi{10.1214/20-BA1221}
 

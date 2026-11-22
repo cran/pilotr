@@ -342,20 +342,20 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(pilotr)</span></code></pre></div>
-<p>pilotr ships one ready-to-run specification per design family. The
-same JSON files drive the Python twin and the no-code app, so a design
-authored once runs unchanged across all three.
-<code>pilotr_example()</code> lists them, and returns the path to each
-for <code>load_spec()</code>.</p>
+<p>Eight ready-to-run specifications are bundled with the package,
+covering six of the eight response families and between-subjects,
+crossed, nested and partially crossed designs. The same JSON files drive
+the Python package and the no-code app. <code>pilotr_example()</code>
+lists them and returns the path to each for
+<code>load_spec()</code>.</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">pilotr_example</span>()</span></code></pre></div>
 <pre><code>[1] &quot;beta_proportion&quot;         &quot;between_2group_gaussian&quot;
 [3] &quot;crossed_mixed_rt&quot;        &quot;nested_clusters&quot;        
 [5] &quot;ordinal_likert_between&quot;  &quot;partial_crossing&quot;       
 [7] &quot;poisson_counts_between&quot;  &quot;reading_time_continuous&quot;</code></pre>
-<p>Each specification is simulated below, showing the family it draws
-from and the first rows of the data it produces. The specification
-format itself is covered in the <a href="getting-started.html">Get
-started</a> article.</p>
+<p>Each specification is simulated below, showing the design it
+describes, its response family and the first rows of the data it
+produces. The specification format is covered in the <a href="getting-started.html">Get started</a> article.</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>desc <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
 <span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  <span class="at">between_2group_gaussian =</span> <span class="st">&quot;Two-group between-subjects Gaussian.&quot;</span>,</span>
 <span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="at">crossed_mixed_rt        =</span></span>
@@ -365,7 +365,7 @@ started</a> article.</p>
 <span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    <span class="st">&quot;Five-point Likert responses via a cumulative-logit model.&quot;</span>,</span>
 <span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>  <span class="at">poisson_counts_between  =</span> <span class="st">&quot;Count outcomes through a log link.&quot;</span>,</span>
 <span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>  <span class="at">reading_time_continuous =</span></span>
-<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>    <span class="st">&quot;A continuous predictor with a lognormal reading-time outcome.&quot;</span>,</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>    <span class="st">&quot;Three continuous predictors, a two-level factor and their interactions with age.&quot;</span>,</span>
 <span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>  <span class="at">nested_clusters         =</span></span>
 <span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>    <span class="st">&quot;Subjects nested in higher-level clusters, an extra grouping factor.&quot;</span>,</span>
 <span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>  <span class="at">partial_crossing        =</span> <span class="st">&quot;Each subject sees a sampled subset of items.&quot;</span></span>
@@ -910,8 +910,8 @@ control
 </div>
 <div id="reading_time_continuous" class="section level3">
 <h3>reading_time_continuous</h3>
-<p>A continuous predictor with a lognormal reading-time outcome. The
-<code>lognormal</code> family, 4000 rows.</p>
+<p>Three continuous predictors, a two-level factor and their
+interactions with age. The <code>lognormal</code> family, 4000 rows.</p>
 <table class="table data-output">
 <thead>
 <tr>

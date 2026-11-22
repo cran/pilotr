@@ -344,44 +344,95 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(pilotr)</span></code></pre></div>
 <div id="the-challenge" class="section level2">
 <h2>The challenge</h2>
-<p>A toolkit that spans R and Python faces a subtle obstacle. The two
-ecosystems use different default random-number generators (R’s
-Mersenne-Twister with inversion, NumPy’s PCG64), so a direct port
-produces different data from the same seed. That would undermine the
-guarantee that a design authored once can be reproduced anywhere.</p>
+<p>The R and Python ecosystems use different default random-number
+generators (R’s Mersenne-Twister with inversion, NumPy’s PCG64), so a
+direct port produces different data from the same seed. That would
+undermine the guarantee that a design authored once can be reproduced
+anywhere.</p>
 </div>
 <div id="a-shared-generator" class="section level2">
 <h2>A shared generator</h2>
-<p>pilotr sets aside the native RNGs and provides a shared generator
-implemented identically in both languages. Uniform deviates come from
-L’Ecuyer’s (1988) combined linear congruential generator, whose
-arithmetic stays below <span class="math inline">\(2^{53}\)</span> and
-is therefore exact in IEEE-754 doubles (R) and Python integers alike.
-Normal deviates use Wichura’s (1988) Algorithm AS 241 inverse-CDF, the
-algorithm R’s <code>qnorm()</code> uses, so deviates agree to full
-double precision. The remaining draws (Cholesky-correlated random
-effects, inverse-CDF Poisson and ordinal draws, Marsaglia–Tsang gamma
-draws for the Beta family, a Fisher–Yates item sampler for partial
+<p>In place of the default generators, pilotr provides a shared
+generator implemented identically in both languages. Uniform deviates
+come from L’Ecuyer’s (1988) combined linear congruential generator.
+Every intermediate product stays below <span class="math inline">\(2^{53}\)</span>, so the arithmetic is exact in R’s
+IEEE-754 doubles and in Python integers alike. Normal deviates use
+Wichura’s (1988) Algorithm AS 241 inverse-CDF, the algorithm R’s
+<code>qnorm()</code> uses. The remaining draws (Cholesky-correlated
+random effects, inverse-CDF Poisson and ordinal draws, Marsaglia–Tsang
+gamma draws for the Beta family, a Fisher–Yates item sampler for partial
 crossing) are derived from those two through a documented, identical
-consumption order.</p>
+draw order.</p>
 <p>As a result, given the same specification and seed, the R and Python
-implementations produce identical data sets: bit for bit for rounded and
-Gaussian responses, and within a few units in the last place where an
-unrounded family applies <code>exp()</code> or <code>log()</code>, as
-the parity check below quantifies. The specification is the source of
-truth, and every implementation answers to it.</p>
+implementations produce identical data wherever they share a maths
+library, as on Linux, except in a rare Beta case under R 4.6.0 or later.
+Continuous integration runs every case of the parity harness on Linux.
+The harness holds every case to the last bit except the unrounded dumps
+of <code>crossed_mixed_rt</code>, <code>reading_time_continuous</code>
+and <code>stress_exgaussian</code>, which
+<code>tools/parity/tolerance.json</code> allows to differ by up to 8
+units in the last place, on Linux as on any other platform.</p>
+<p>IEEE-754 fixes the rounding of arithmetic but leaves that of
+<code>exp()</code>, <code>log()</code> and <code>pow()</code> to the
+library. On Windows, R and Python do not share one. There, a value that
+passes through those functions can differ in its last bits, and every
+family has such a path. The figures below were measured on Windows 11
+with R 4.6.1 and Python 3.13.</p>
+<ul>
+<li>Normal draws pass through <code>log()</code> in AS 241’s tail
+branch, which about 15% of draws take. About 1.4e-5 of normal draws
+differed, by 1 to 3 units in the last place (ulp), so Gaussian data can
+differ too.</li>
+<li>Responses of the lognormal families and the ex-Gaussian differed by
+1 ulp.</li>
+<li>An unrounded Beta response differed by up to 35 ulp.</li>
+<li>A discrete outcome can in principle move by a whole category,
+although none did in 50,000 rows of each discrete family.</li>
+</ul>
+<p>One Beta case can differ on Linux too, under R 4.6.0 or later. From
+that version, R’s <code>^</code> computes a cube or a fourth power by
+repeated multiplication, where Python calls <code>pow()</code>, as R did
+before. A Beta response whose Gamma shape is exactly 1/3 or 1/4 can
+therefore differ in its last bits. Such a shape needs a cell whose rows
+share one linear predictor, as in a Beta design with no random effects
+and a linear predictor of 0, where a <code>phi</code> of 0.5 gives
+shapes of 1/4.</p>
+<p>A square is computed by multiplication in both languages. R’s
+<code>^</code> computes it that way in every version, and Python
+computes a boost whose exponent is exactly 2 as <code>u * u</code>. A
+design with a <code>phi</code> of 1, which gives shapes of 1/2,
+therefore draws the same data in both. Up to version 0.3.0, the Python
+package computed that square with <code>pow()</code>, and such a design
+could differ in its last bits.</p>
+<p>Rounding has removed every continuous difference observed so far, but
+it guarantees nothing. A last-bit difference can straddle a rounding
+boundary, and <code>round</code> is not allowed for the discrete
+families. <code>build_spec()</code>, which builds the no-code app’s
+specifications, rounds the Gaussian, lognormal, shifted lognormal and
+ex-Gaussian responses to four decimals and leaves a Beta response
+unrounded, for the reason <code>?build_spec</code> gives. The only way
+to obtain agreement to the last bit in every family is to run both
+languages on a platform where they share a maths library, outside the
+Beta case under R 4.6.0 or later. The section <a href="https://github.com/pablobernabeu/pilotr/blob/main/spec/SPEC.md#scope-of-the-guarantee">Scope
+of the guarantee</a> of the specification gives the measurements in
+full.</p>
 </div>
 <div id="determinism-in-r" class="section level2">
 <h2>Determinism in R</h2>
-<p>The same specification and seed always give the same data.</p>
+<p>On one platform, the same specification and seed always give the same
+data.</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>spec <span class="ot">&lt;-</span> <span class="fu">build_spec</span>(<span class="fu">list</span>(</span>
 <span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;demo&quot;</span>, <span class="at">seed =</span> <span class="dv">2024</span>, <span class="at">design_kind =</span> <span class="st">&quot;between&quot;</span>, <span class="at">n_subject =</span> <span class="dv">200</span>,</span>
 <span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>  <span class="at">factor_name =</span> <span class="st">&quot;group&quot;</span>, <span class="at">lev1 =</span> <span class="st">&quot;a&quot;</span>, <span class="at">lev2 =</span> <span class="st">&quot;b&quot;</span>,</span>
 <span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>  <span class="at">intercept =</span> <span class="dv">100</span>, <span class="at">effect =</span> <span class="dv">5</span>, <span class="at">family =</span> <span class="st">&quot;gaussian&quot;</span>,</span>
 <span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>  <span class="at">resp_name =</span> <span class="st">&quot;score&quot;</span>, <span class="at">sigma =</span> <span class="dv">10</span>))</span>
 <span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="fu">isTRUE</span>(<span class="fu">all.equal</span>(<span class="fu">simulate_design</span>(spec), <span class="fu">simulate_design</span>(spec)))</span></code></pre></div>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="fu">identical</span>(<span class="fu">simulate_design</span>(spec), <span class="fu">simulate_design</span>(spec))</span></code></pre></div>
 <pre><code>[1] TRUE</code></pre>
+<p>Across operating systems, the same holds on the terms set out above,
+since R takes <code>exp()</code>, <code>log()</code> and
+<code>pow()</code> from the platform’s maths library, as Python
+does.</p>
 <p>Changing the seed changes the draws, while the structure and the
 ground-truth parameters stay fixed.</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>spec2 <span class="ot">&lt;-</span> spec; spec2<span class="sc">$</span>seed <span class="ot">&lt;-</span> spec<span class="sc">$</span>seed <span class="sc">+</span> <span class="dv">1</span><span class="dt">L</span></span>
@@ -390,23 +441,20 @@ ground-truth parameters stay fixed.</p>
 </div>
 <div id="the-same-design-in-python" class="section level2">
 <h2>The same design in Python</h2>
-<p>The Python package reads the identical specification and produces the
-identical data. The code below is not evaluated here. It shows the
-Python you would run, and its output matches the R data to the last
-bit.</p>
+<p>The Python package reads the same specification. The code below,
+which is not evaluated here, shows the Python you would run. Its output
+matches the R data to the last bit wherever the two share a maths
+library.</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="im">from</span> pilotr <span class="im">import</span> simulate, load_spec</span>
 <span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a></span>
 <span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="co"># the same design.json the R package (and the app) use</span></span>
 <span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>data <span class="op">=</span> simulate(<span class="st">&quot;design.json&quot;</span>)</span></code></pre></div>
-<p>The repository includes a parity check that simulates the worked
-example designs in both languages and reports the maximum absolute
-difference per design. This is the CSV-level check, read at the
-precision a written file carries and with a tolerance of 1e-6. The
-stricter one is the harness under <code>tools/parity/</code>, which
-dumps every value at 17 significant digits, accounts for each differing
-cell in units in the last place against a recorded allowance, and runs
-as a gate in continuous integration. The table below is the readable
-summary, and that harness is what the bit-identical claim rests on.</p>
+<p>The repository includes a parity check that compares the CSV files
+the R and Python demo scripts write for six of the worked example
+designs, all but the ordinal and Poisson ones. It reports the maximum
+absolute difference per design, reads values at the precision a written
+file carries and has a tolerance of 1e-6. The table below summarises
+it.</p>
 <table class="table data-output">
 <thead>
 <tr>
@@ -532,52 +580,77 @@ partial
 </tr>
 </tbody>
 </table>
-<p>The difference is exactly zero for every design whose responses are
-rounded, and about 5e-15 for the unrounded continuous design, where R’s
-CSV writer prints 15 significant digits. At that precision the residual
-cannot be told apart from the writer’s own rounding, and it is what the
-check’s 1e-6 tolerance is there to absorb. The stricter harness dumps 17
-digits and resolves what is really there: a handful of cells apart by a
-few units in the last place, from <code>exp()</code>, whose rounding
-IEEE-754 does not fix. There are no categorical mismatches anywhere. The
-uniform stream is exact by construction, since every intermediate
-product stays below <span class="math inline">\(2^{53}\)</span>, and the
-harness pins every path built from IEEE-exact arithmetic alone to a
-recorded hash in <code>tools/parity/golden.json</code>. The cases whose
-values pass through <code>exp()</code> or <code>log()</code> are
-deliberately left unpinned, because those last bits belong to the maths
-library and so are not the specification’s to fix. The cross-language
-comparison still gates them on every run. The parity check can be rerun
-on any new platform, so a design verified on a laptop can be confirmed
-on an HPC node before a large run.</p>
+<p>The difference is exactly zero for five of the six designs. The
+sixth, <code>continuous</code> (<code>reading_time_continuous</code>),
+has a rounded response that agrees exactly. Its continuous predictors
+are unrounded, and R’s CSV writer prints them to 15 significant digits.
+Those predictors differ by about 5e-15. At that precision, the residual
+cannot be told apart from the writer’s own rounding, and the tolerance
+of 1e-6 is there to absorb it. The parity check can be rerun on any new
+platform, so a design verified on a laptop can be confirmed on an HPC
+node before a large run.</p>
+<p>The bit-identical claim rests on a stricter check, the harness under
+<code>tools/parity/</code>. It dumps every value at 17 significant
+digits, which shows whether the values themselves differ. It accounts
+for each differing cell in units in the last place against a recorded
+allowance and must pass in continuous integration. On Windows, it finds
+a handful of cells one unit in the last place apart, from
+<code>exp()</code>, and no categorical mismatches. On Linux, where it
+runs in continuous integration, every cell agrees. The uniform stream is
+exact by construction. The harness checks the Gaussian cases against
+recorded hashes in <code>tools/parity/golden.json</code>, relying on the
+observed agreement of AS 241’s <code>log()</code> across platforms. The
+cases are small enough that none has met one of the rare normal draws
+that differ. The cases whose values pass through <code>exp()</code>,
+<code>log()</code> or <code>pow()</code> on the way to the response have
+no recorded hashes, because the maths library determines those last
+bits. They must still pass the cross-language comparison on every
+run.</p>
 </div>
 <div id="the-analysis-layer" class="section level2">
 <h2>The analysis layer</h2>
-<p>Everything above concerns the data the generator produces.
-<code>solve_curve()</code> sits a layer above it, taking a curve that
-has already been simulated and fitting a model to it, and it is held to
-a different standard on purpose. Its fit calls <code>exp()</code> and
-the normal distribution function at every iteration, so the two engines
-cannot be asked to land on the same bits, and a recorded hash would pin
-whichever maths library happened to record it. What they are asked for
-is agreement far closer than any reading of the result could depend on.
-The script <code>tools/parity/solve_cross.py</code> puts the same fixed
-curves through both engines and compares the solved value, its interval,
-the fitted coefficients and the text of every refusal. The largest
-relative difference measured over those cases is 5.0e-15, against an
-allowance of 1e-9. On a solved sample size of 220 subjects that
-allowance comes to two ten-millionths of a subject. Every refusal
-message is identical character for character.</p>
+<p><code>solve_curve()</code> fits a model to a curve that has already
+been simulated, and it is held to a different standard from the
+generator. Its fit calls <code>exp()</code> and the normal distribution
+function at every iteration. A recorded hash would therefore be valid
+only for the maths library that produced it, and the two engines cannot
+be expected to agree to the last bit. They must instead agree far more
+closely than any reading of the result could depend on. The script
+<code>tools/parity/solve_cross.py</code> puts the same fixed curves
+through both engines and compares the solved value, its interval, the
+fitted coefficients and the text of a selection of error messages. Each
+of those error messages is identical character for character. The
+largest relative difference measured over those curves is about 5e-15,
+against an allowance of 1e-9. On a solved sample size of 220 subjects,
+that allowance comes to two ten-millionths of a subject.</p>
+<p>The mixed models of the two <code>power_mixed()</code> functions come
+from <code>model_formula()</code> and <code>model_data()</code>, which
+the Python package ports from this one. The script
+<code>tools/parity/formula_cross.py</code> gives the Python ports the
+data R simulated for every worked example and parity case. Both packages
+must write the same formula character for character and the same
+contrast and product columns bit for bit. The fits that follow can
+differ. <code>lme4</code> and <code>statsmodels</code> are different
+programs, this package estimates the random-effect correlations that the
+Python one leaves out, and the two test with different statistics. The
+Python power guide sets out where their results diverge.</p>
+<p><code>power_report()</code> writes a sample-size justification from a
+result’s counts of significant replicates and of the replicates behind
+each rate. It computes each Monte Carlo error with the functions both
+packages use to compute these errors, which return the same doubles for
+the same counts, and formats the errors in the same way. The script
+<code>tools/parity/report_cross.py</code> renders a set of stored
+records in both engines and requires the same text, byte for byte.</p>
 </div>
 <div id="why-this-matters" class="section level2">
 <h2>Why this matters</h2>
-<p>Because the specification is the source of truth and the generator is
-shared, a design can be authored once (in the app, in R or in Python)
-and reproduced everywhere. It can be preregistered as a small JSON file
-that anyone can run, scaled from a laptop to a cluster without drift and
-handed between collaborators who work in different languages.</p>
-<p>This property turns an informal request to simulate some data into a
-reproducible, shareable methodological artefact.</p>
+<p>Because every implementation must follow the specification and the
+generator is shared, a design authored once in the app, in R or in
+Python can be reproduced everywhere. It can be preregistered as a small
+JSON file that anyone can run, scaled from a laptop to a cluster and
+handed between collaborators who work in different languages. Its data
+agree to the last bit wherever the machines share a maths library,
+outside the Beta case under R 4.6.0 or later.</p>
 </div>
 
 

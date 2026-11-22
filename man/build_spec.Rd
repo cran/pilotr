@@ -8,16 +8,20 @@ build_spec(p)
 }
 \arguments{
 \item{p}{A named list of design inputs. Common fields are \code{name}, \code{seed},
-\code{n_subject}, \code{design_kind} (\code{"between"} or \code{"within"}), \code{include_items},
-\code{n_item}, \code{factor_name}, \code{lev1}, \code{lev2}, \code{intercept}, \code{effect},
-\code{family}, \code{resp_name}, and family parameters such as \code{sigma}, \code{shift},
-\code{thresholds}, or \code{phi}; within-design random effects use \code{subj_int_sd},
-\code{subj_slope_sd}, \code{subj_corr}, \code{item_int_sd}, \code{item_slope_sd}, and
-\code{item_corr}.}
+\code{n_subject}, \code{design_kind} (\code{"between"} or \code{"within"}), \code{include_items} and \code{n_item}
+(read for a within design only), \code{factor_name}, \code{lev1}, \code{lev2}, \code{intercept}, \code{effect},
+\code{family}, \code{resp_name} (blank or \code{NULL} for the name \code{\link[=default_response_name]{default_response_name()}} gives) and
+the family's parameters: \code{sigma} for the four continuous families, \code{shift} for
+\code{"shifted_lognormal"}, \code{beta} for \code{"exgaussian"}, \code{phi} for \code{"beta"} and, for \code{"ordinal"},
+\code{thresholds} as a single comma-separated string such as \code{"-2, -0.6, 0.6, 2"}, as the
+no-code app supplies it. Within-design random effects use \code{subj_int_sd},
+\code{subj_slope_sd}, \code{subj_corr}, \code{item_int_sd}, \code{item_slope_sd} and
+\code{item_corr}. \code{counterbalance = TRUE} counterbalances the factor of a
+within design with items, and is ignored in any other design.}
 }
 \value{
 A design specification as a nested list, ready for
-\code{\link[=simulate_design]{simulate_design()}}, \code{\link[=spec_json]{spec_json()}}, or the
+\code{\link[=simulate_design]{simulate_design()}}, \code{\link[=spec_json]{spec_json()}} or the
 power and precision functions.
 }
 \description{
@@ -25,8 +29,25 @@ Assemble a portable design specification (a plain list, serialisable with
 \code{\link[=spec_json]{spec_json()}}) from the flat set of inputs collected by the no-code
 application: sample sizes, the two-level factor and its levels, the fixed
 intercept and effect, the random-effect standard deviations for
-within-subject and crossed designs, and the response family with its
-parameters.
+within-subject and crossed designs and the response family with its parameters.
+}
+\details{
+A response of the Gaussian, lognormal, shifted lognormal or ex-Gaussian family is rounded to
+four decimals, and a \code{beta} response is left unrounded. Rounding moves every proportion near 0
+or 1 onto the nearest value inside the interval at that many decimals. At four decimals, 9.8\% of the
+40,000 rows of a design with \code{phi = 0.8} landed on 0.0001 or 0.9999, and rows at such a bound
+dominate a Beta likelihood (see \code{\link[=brms_bridge]{brms_bridge()}}). Unrounded, the data keep the distribution the
+specification describes. They can then differ between R and 'Python' in their last bits where
+the two do not share a maths library, as the cross-language vignette sets out.
+
+Counterbalanced lists show each subject each item at one level of the factor, rotating the
+levels over subjects and items as a Latin square does, so a design has half the rows of the
+fully crossed one. They set \code{counterbalance} on the factor, a field of specification version
+0.4 described under Counterbalanced lists in the specification.
+
+The specification declares the lowest \code{spec_version} that reads it. Only counterbalanced lists
+need a version above 0.3, so the releases of either package that read 0.3 read every other
+design built here.
 }
 \examples{
 build_spec(list(name = "demo", seed = 1, design_kind = "between",

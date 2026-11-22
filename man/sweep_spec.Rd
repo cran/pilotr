@@ -4,47 +4,90 @@
 \alias{sweep_spec}
 \title{Sweep an analysis over one field of a design specification}
 \usage{
-sweep_spec(spec, path, values, fn, ..., .name = NULL)
+sweep_spec(
+  spec,
+  path,
+  values,
+  fn,
+  ...,
+  .name = NULL,
+  .seeds = c("independent", "shared")
+)
 }
 \arguments{
 \item{spec}{A design specification (path or list).}
 
 \item{path}{The field to vary, as \code{"units$subject$n"} or \code{c("units", "subject", "n")}.}
 
-\item{values}{A vector or list of values to set the field to, one grid point each.}
+\item{values}{A vector or list of values to set the field to, one grid point each.
+\code{\link[=design_conditions]{design_conditions()}} builds such a list for an effect-size sweep.}
 
 \item{fn}{The analysis to run at each grid point, for example \code{\link[=power_mixed]{power_mixed()}} or
 \code{\link[=precision_design]{precision_design()}}. It is called as \code{fn(spec, ...)}.}
 
-\item{...}{Further arguments passed to \code{fn} at every grid point.}
+\item{...}{Further arguments passed to \code{fn} at every grid point. A cluster passed as \code{cl} to an
+analysis that takes one, such as \code{\link[=power_mixed]{power_mixed()}}, serves every point, so that one pool of
+workers runs the whole sweep.}
 
 \item{.name}{Name for the column recording the swept value. Defaults to the last element of
 \code{path}.}
+
+\item{.seeds}{How the grid points are seeded. \code{"independent"}, the default, gives point \code{i} of
+\code{J} the seed \code{replicate_seeds(spec$seed, J)[i]}, and \code{"shared"} gives every point the
+specification's own seed (see Details).}
 }
 \value{
-A data frame binding the results, with the swept value as the leading column. When the
-swept values are not scalars, that column holds the grid index instead. \code{\link[=solve_curve]{solve_curve()}}
-reads that leading column, so a sweep goes straight into a solve.
+A data frame binding the results, with the swept value as the leading column, or the
+grid index when the values are lists. \code{\link[=solve_curve]{solve_curve()}} reads that leading column by default,
+so a sweep over single values goes straight into a solve.
 }
 \description{
-Vary a single field of a specification across a set of values, run an analysis at each, and bind
+Vary a single field of a specification across a set of values, run an analysis at each and bind
 the results into one data frame. Sample size is the axis users sweep most often, and
-\code{\link[=power_curve_mixed]{power_curve_mixed()}} and \code{\link[=precision_curve]{precision_curve()}} are wrappers around this for it, but any field can
-be swept, including an effect size, a random-effect standard deviation, a residual standard
-deviation, or the number of items per subject.
+\code{\link[=power_curve_mixed]{power_curve_mixed()}} and \code{\link[=precision_curve]{precision_curve()}} call this function over it, but any field can be
+swept, including an effect size, a random-effect standard deviation, a residual standard
+deviation or the number of items per subject.
 }
 \details{
 The specification is validated once, before the sweep, so a mistake in it is reported before any
 fitting starts rather than repeated at every grid point.
 
 A value may be a scalar, which replaces the addressed field, or a list, which replaces it
-wholesale. Replacing a whole \code{fixed$coefficients} object is how an effect-size sweep works, and
-\code{\link[=design_conditions]{design_conditions()}} builds those objects, including a common all-zero condition for examining
-behaviour under the null.
+wholesale. The conditions \code{\link[=design_conditions]{design_conditions()}} builds are the exception, because each names
+only the effects it varies. Each condition is merged into the addressed list with
+\code{\link[utils:modifyList]{utils::modifyList()}}, so the coefficients it names take its values and every other
+coefficient keeps the specification's, in the specification's order. That is the order in
+which the linear predictor is summed, so a condition simulates exactly the data of the
+specification edited by hand. A condition may name only coefficients the specification
+already has, and any other name is refused.
+
+Each grid point draws its own replicates. Point \code{i} of a sweep over \code{J} values takes
+\code{replicate_seeds(spec$seed, J)[i]} as its seed, and the analysis derives its replicates' seeds
+from that, so no two points share their random numbers. \code{\link[=solve_curve]{solve_curve()}} fits the points of a
+curve as independent binomial counts, and its interval keeps its nominal coverage only when they
+are. The rule is prefix-stable: appending values to a sweep leaves the earlier points' results
+as they were. It depends on order, though, since a point's seed follows its position in
+\code{values}, so reordering the values, or inserting one, changes the results at every point that
+moves. A sweep over \code{seed} itself sets each point's seed to the value swept.
+
+\code{.seeds = "shared"} gives every point the specification's own seed. The points then share
+their noise, so the curve looks smoother than its Monte Carlo error allows and an interval
+fitted to it is too narrow. Over 1,000 emulated curves for each
+of twelve settings on a tight grid of sample sizes, the nominal 95\% interval of \code{\link[=solve_curve]{solve_curve()}}
+covered the true size in 87.8\% of solves with shared seeds and in 96.5\% with independent ones.
+On an effect-size axis, where the design and so every draw stay the same from point to point, the
+figures were 70.3\% and 95.7\%.
 
 The result of \code{fn} is coerced to a data frame: a \code{pilotr_power} object becomes one row per focal
-effect, a data frame is used as it stands, and a plain list becomes a single row. The swept value
-is added as a leading column, named by \code{.name} where the value is a scalar.
+effect, a data frame is used as it stands and a plain list becomes a single row. The swept value
+is added as a leading column named by \code{.name}. A list has no single value to record, so a sweep
+over lists, the conditions \code{\link[=design_conditions]{design_conditions()}} builds included, records the grid index there.
+\code{\link[=solve_curve]{solve_curve()}} then needs \code{x} to name the column that holds the effect. To vary a single
+effect, sweep its own coefficient. For example,
+\code{sweep_spec(spec, "fixed$coefficients$cond", c(0, 0.02, 0.04), power_mixed)} keeps the other
+coefficients and names the leading column \code{cond}, so
+\code{solve_curve(curve, target = 0.8, effect = "cond", transform = "identity")} returns the
+minimum detectable effect.
 }
 \examples{
 \donttest{
@@ -60,9 +103,9 @@ if (requireNamespace("lme4", quietly = TRUE) &&
   # Sample size, the same sweep power_curve_mixed() performs.
   sweep_spec(spec, "units$subject$n", c(12, 18), power_mixed, n_sims = 8)
 
-  # Effect size, which the old curve functions could not reach.
+  # Effect size, which power_curve_mixed() and precision_curve() do not sweep.
   sweep_spec(spec, "fixed$coefficients",
-             design_conditions(effect = c(0, 0.03, 0.06)), power_mixed, n_sims = 8)
+             design_conditions(effect = c(0.03, 0.06)), power_mixed, n_sims = 8)
 }
 }
 }

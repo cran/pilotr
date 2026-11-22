@@ -5,11 +5,15 @@
 
 <!-- badges: start -->
 
+[![CRAN
+status](https://www.r-pkg.org/badges/version/pilotr)](https://CRAN.R-project.org/package=pilotr)
 [![R-CMD-check](https://github.com/pablobernabeu/pilotr/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/pablobernabeu/pilotr/actions/workflows/R-CMD-check.yaml)
 [![Lifecycle:
 experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 [![License:
 MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/license/MIT)
+[![DOI
+10.32614/CRAN.package.pilotr](https://img.shields.io/badge/DOI-10.32614%2FCRAN.package.pilotr-blue.svg)](https://doi.org/10.32614/CRAN.package.pilotr)
 <!-- badges: end -->
 
 Simulate experimental and behavioural data from a portable design
@@ -27,17 +31,33 @@ package.
 
 This is the twin of [the Python
 package](https://pablobernabeu.github.io/pilotr/python/) of the same
-name. The two share the design specification and the random-number
+name. Both packages use the same design specification and random-number
 generator, so the same specification and seed produce identical data in
-either language, bit for bit apart from a documented tolerance of a few
-units in the last place where an unrounded response family applies
-`exp()` or `log()` to the linear predictor. The Python package carries
-the generative core. The R package additionally offers precision/ROPE
-design analysis, the `lme4` reference backend for mixed-effects power,
-the `brms` bridge, the analysis-script emitters, the helpers that derive
-the analysis model and build specifications, and the app launcher.
+either language wherever the two share a maths library, as on Linux,
+except in a rare Beta case under R 4.6.0 or later that the
+[cross-language
+article](https://pablobernabeu.github.io/pilotr/r/articles/cross-language.html)
+describes. Elsewhere, a value that passes through `exp()`, `log()` or
+`pow()` can differ in its last bits, as the same article sets out.
+
+The Python package includes the generative core, simulation-based power,
+the helpers that derive the analysis model, `power_report()` and the
+curve solvers `solve_curve()` and `target_n()`. The R package
+additionally offers precision/ROPE design analysis, power curves for
+mixed-effects designs, the `lme4` reference backend for mixed-effects
+power, the `brms` bridge, the analysis-script emitters, the helpers that
+build, calibrate and sweep specifications, and the app launcher.
 
 ## Installation
+
+pilotr is on [CRAN](https://CRAN.R-project.org/package=pilotr):
+
+``` r
+install.packages("pilotr")
+```
+
+The development version installs from the `r/pilotr` subdirectory of the
+[GitHub repository](https://github.com/pablobernabeu/pilotr):
 
 ``` r
 # install.packages("remotes")
@@ -46,9 +66,9 @@ remotes::install_github("pablobernabeu/pilotr", subdir = "r/pilotr")
 
 ## Quick start
 
-The package ships a specification per design family, so the example
-below runs as it stands. `pilotr_example()` returns the path to one of
-them, here a crossed by-subject and by-item reaction-time design.
+The package includes eight example specifications, so the example below
+runs as it stands. `pilotr_example()` returns the path to one of them,
+here a crossed by-subject and by-item reaction-time design.
 
 ``` r
 library(pilotr)
@@ -65,39 +85,41 @@ head(data)
 #> 6       1    3 unrelated 516.6668
 ```
 
-The specification carries a seed, so those rows are the same on every
-machine and in the Python twin. Point `load_spec()` at your own
-`design.json` to simulate a design of your own.
+The specification includes a seed, so those rows are the same on every
+machine and in the Python twin, to the last bit wherever the maths
+library is the same. Point `load_spec()` at your own `design.json` to
+simulate a design of your own.
 
 Power and design analysis run from the same object. The call below is
-not evaluated here because it needs a few hundred model fits and `lme4`,
-which the package suggests without requiring.
+not evaluated here because it needs a few hundred model fits and the
+`lme4` and `lmerTest` packages, which pilotr suggests without requiring.
 
 ``` r
-power_mixed(spec, n_sims = 200)   # crossed-LMM power + Type S/M (lme4)
+power_mixed(spec, n_sims = 200)   # crossed-LMM power + Type S/M (lme4, lmerTest)
 cat(generate_r_script(spec))      # a self-contained, reproducible script
 ```
 
 The [power
 article](https://pablobernabeu.github.io/pilotr/r/articles/power-analysis.html)
-shows its output, alongside a power curve over sample size and
-`target_n()`, which solves that curve for the sample size a target power
-needs and reports an interval on it.
+shows the output of `power_mixed()`, alongside a power curve over sample
+size and `target_n()`, which solves that curve for the sample size a
+target power needs and reports an interval on it.
 
 ## Try it without installing
 
-A serverless build runs entirely in your browser, with no installation
-required and no data uploaded. It is available as a [no-code
-app](https://pablobernabeu.github.io/pilotr/app/).
+A serverless build of the [no-code
+app](https://pablobernabeu.github.io/pilotr/app/) runs in your browser,
+with no installation required and no data uploaded.
 
 ## Learn more
 
 The [Get started
 article](https://pablobernabeu.github.io/pilotr/r/articles/getting-started.html)
-walks through the core loop of describe, simulate, inspect and export,
-and the other articles each go deeper into one part of the workflow. The
-full repository, including the specification format and the no-code app,
-is at <https://github.com/pablobernabeu/pilotr>.
+walks through the core workflow of describing, simulating, inspecting
+and exporting a design, and each of the other articles covers one part
+of the workflow in more detail. The repository, including the
+specification format and the no-code app, is at
+<https://github.com/pablobernabeu/pilotr>.
 
 ## Citation
 
@@ -105,11 +127,15 @@ is at <https://github.com/pablobernabeu/pilotr>.
 citation("pilotr")
 ```
 
+The DOI that CRAN assigned to the package is
+<https://doi.org/10.32614/CRAN.package.pilotr>, and it covers every
+version.
+
 The [About
 page](https://pablobernabeu.github.io/pilotr/r/articles/about.html)
-carries the same citation with a BibTeX entry, and a short note on the
-developer. The repository also ships `CITATION.cff`, which is what
-GitHub’s *Cite this repository* button reads.
+gives the same citation, with a BibTeX entry, and a short note on the
+developer. The repository also includes `CITATION.cff`, which GitHub’s
+‘Cite this repository’ button reads.
 
 ## Licence
 

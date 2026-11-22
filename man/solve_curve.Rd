@@ -17,13 +17,13 @@ solve_curve(
 }
 \arguments{
 \item{curve}{A curve, as returned by \code{\link[=power_curve_mixed]{power_curve_mixed()}}, \code{\link[=precision_curve]{precision_curve()}} or
-\code{\link[=sweep_spec]{sweep_spec()}}: one row per swept value, with the swept value, a decision rate, and the
-number of replicates behind it.}
+\code{\link[=sweep_spec]{sweep_spec()}}: one row per swept value, with the swept value, a decision rate and the number
+of replicates behind it.}
 
 \item{target}{The decision rate to solve for, strictly between 0 and 1.}
 
 \item{x}{Name of the column holding the swept value. \code{NULL}, the default, takes the leading
-column.}
+column, which holds a grid index when the sweep was over lists.}
 
 \item{y}{Name of the column holding the decision rate. \code{NULL}, the default, takes \code{power} or
 \code{p_meaningful}, whichever is present.}
@@ -46,17 +46,17 @@ A list with elements \code{value} (the solved swept value), \code{lo} and \code{
 bounds), \code{level}, \code{target}, \code{se} (the delta-method standard error on the fitted scale, the
 scale on which the interval is symmetric), \code{dispersion} (the heterogeneity factor applied,
 1 where the model fits), \code{x} and \code{y} (the columns used), \code{transform}, \code{intercept} and \code{slope}
-(the fitted coefficients), \code{n_points} (the number of curve points the fit used), and \code{x_min}
-and \code{x_max} (the swept range). A bound is allowed to fall outside that range. When one does,
-the sweep was too narrow to pin the value down and should be widened. A \code{dispersion} well
-above 1 says the curve is not the shape the model assumes, so the solve deserves a wider grid
-or more replicates before it deserves any trust.
+(the fitted coefficients), \code{n_points} (the number of curve points the fit used) and \code{x_min} and
+\code{x_max} (the swept range). A bound is allowed to fall outside that range. When one does, the
+sweep was too narrow to pin the value down and should be widened. A \code{dispersion} well above 1
+says the curve is not the shape the model assumes, so the solve needs a wider grid or more
+replicates before it can be trusted.
 }
 \description{
-Take the curve a sweep has already produced, fit the decision rate against the swept value,
+Take the curve a sweep has already produced, fit the decision rate against the swept value
 and solve for the value at which the rate meets a target. The solved value comes with a
-confidence interval, because a point read off a simulated curve without one repeats the
-overconfidence that design analysis exists to expose.
+confidence interval, because a value read off a simulated curve without one hides the uncertainty
+of the simulation.
 }
 \details{
 The input is the data frame \code{\link[=power_curve_mixed]{power_curve_mixed()}}, \code{\link[=precision_curve]{precision_curve()}} or \code{\link[=sweep_spec]{sweep_spec()}}
@@ -72,36 +72,71 @@ probability: under the normal approximation to a two-group comparison, the probi
 linear in the square root of the sample size, so the model has the shape a design analysis
 already implies. Measured against \code{\link[stats:power.t.test]{stats::power.t.test()}} across twelve combinations of effect
 size and target power on each of three grid shapes, at 400 replicates a point, the solved
-sample size fell within 2.9\% of the analytic answer on average, against 3.4\% for a logit
-fitted the same way.
+sample size fell within 2.6\% of the analytic answer on average. A logit fitted the same way did
+as well on that draw, at 2.5\%, and worse on another, at 3.5\% against 2.2\%. Curves this noisy do
+not separate the two links, and the probit is chosen for its shape.
 
 The interval is the delta-method interval of \code{MASS::dose.p()}, computed on the scale named by
-\code{transform} and mapped back, so it is symmetric on that scale and asymmetric on the natural
-one. That asymmetry is the honest shape: at the top of a power curve a given change in rate costs
-far more sample size than the same change lower down. Where the two-parameter model does not
-describe the curve, the interval is widened by the heterogeneity factor of probit analysis,
-Pearson's chi-square over its degrees of freedom (Finney, 1971), reported as \code{dispersion}. It
-is floored at 1, so a well-fitting curve is left alone and a badly-fitting one cannot report a
-narrower interval than its own residuals justify.
+\code{transform} and mapped back, so it is symmetric on that scale and asymmetric on the natural one.
+That asymmetry is correct: at the top of a power curve, a given change in rate costs far more
+sample size than the same change lower down. In the checks against \code{\link[stats:power.t.test]{stats::power.t.test()}}
+above, Fieller's interval for a ratio (Fieller, 1954), tried as the alternative, covered the
+analytic answer as often, at nearly the same width, so the interval \code{MASS::dose.p()} reports is
+kept. Where the two-parameter model does not describe the curve, the interval is widened by the
+heterogeneity factor of probit analysis, Pearson's chi-square over its degrees of freedom
+(Finney, 1971), reported as \code{dispersion}. It is floored at 1, so a well-fitting curve is left
+alone and a badly fitting one cannot report a narrower interval than its own residuals justify.
 
 The default \code{transform} of \code{"sqrt"} suits a sample-size axis, where a rate rises with the
 square root of the sample size. Sweep something else,
 an effect size or a random-effect standard deviation, and \code{"identity"} is usually right.
+
+A sweep over the conditions \code{\link[=design_conditions]{design_conditions()}} builds is a sweep over lists, so its leading
+column holds a grid index, and solving it as it stands would solve for that index. Either name
+the column holding the effect with \code{x}, such as \code{true} in the rows of \code{\link[=power_mixed]{power_mixed()}}, or sweep
+one coefficient by its own path. The curve from
+\code{sweep_spec(spec, "fixed$coefficients$cond", c(0, 0.02, 0.04), power_mixed)} holds the other
+coefficients at their values and leads with a column named \code{cond}. From that curve,
+\code{solve_curve(curve, target = 0.8, effect = "cond", transform = "identity")} returns the minimum
+detectable effect.
 
 Nothing here extrapolates. A curve whose rates do not straddle the target is refused, with the
 range it did cover reported, and so is a fit that solves outside the swept range. A curve
 whose fitted slope cannot be told from zero is refused too: the crossing is then compatible
 with any value at all, and an interval that said otherwise would be false.
 
+A curve over subjects in a crossed design need not rise towards 1. When an effect varies from
+item to item, as a by-item random slope says it does, power at a fixed number of items levels
+off below 1 (Westfall, Kenny and Judd, 2014; Judd, Westfall and Kenny, 2017). Adding subjects
+cannot lift it past that ceiling. The probit model rises towards 1 and cannot follow such a
+plateau. A curve that levels off near the target can then be solved far from the true crossing.
+One that levels off just below the target never crosses it, but Monte Carlo noise can lift a
+simulated rate over the target, and the curve can then be solved as though it crossed. To
+compare designs that trade subjects for items, solve curves over the number of items, one at
+each of a few subject counts, from \code{\link[=sweep_spec]{sweep_spec()}} over \code{units$item$n}. Power over items levels
+off in the same way, at a ceiling set by the by-subject slope and the number of subjects. The
+subject counts must be large enough to put that ceiling well above the target.
+
 What the interval covers is the Monte Carlo uncertainty of the fit, not the gap between the
-fitted shape and the true curve. Across 36 checks against \code{\link[stats:power.t.test]{stats::power.t.test()}} at 400
-replicates a point, the solved size sat within 2.9\% of the analytic answer on average and
-within 6.9\% at worst, and the nominal 95\% interval covered the analytic value 35 times out of
-36. Nearly all of that error is the Monte Carlo noise the interval is describing, and it falls
-with the square root of the replicate count. Raise the count far enough and the interval
-narrows onto a fitted shape that is still slightly the wrong shape, so replicates alone do not
-make a solved size arbitrarily accurate. The remedies are a finer grid, more replicates, or a
-design with a closed form to check against.
+fitted shape and the true curve, and it treats the points of the curve as independent. By
+default, every sweep in pilotr draws each point's replicates from a seed of its own (see
+\code{\link[=sweep_spec]{sweep_spec()}}).
+Over 1,000 simulated curves for each combination of four effect sizes and three target powers,
+at 400 replicates a point, the nominal 95\% interval covered the analytic sample size in 96.5\%,
+95.9\% and 96.2\% of solves on the three grid shapes. For an effect size swept at a fixed sample
+size, it covered the analytic effect in 95.7\% of solves. With \code{seeds = "shared"} (\code{.seeds} in
+\code{\link[=sweep_spec]{sweep_spec()}}), every point reused the specification's seed, and the figures were
+87.8\%, 94.0\%, 93.5\% and 70.3\%. A curve
+assembled by hand, from separate runs that each started from the same seed, shares its noise in
+the same way. In the calibration's 36 checks, the solved size sat within 2.6\% of the analytic
+answer on average and within 7.7\% at worst. Nearly all of that error is the Monte Carlo noise
+the interval is describing, and it falls with the square root of the replicate count. Raise the
+count far enough and the interval narrows onto a fitted shape that is still slightly the wrong
+shape, so replicates alone do not make a solved size arbitrarily accurate. The remedies are more
+replicates, a finer grid or a design with a closed form to check against. A finer grid helps
+only while its points are independent. With shared seeds, its points share more of their noise,
+and the tight grid, whose points lie closest together, covered 87.8\% where the coarse one
+covered 94.0\%.
 }
 \examples{
 spec <- build_spec(list(name = "s", seed = 1, design_kind = "between", n_subject = 40,
@@ -122,6 +157,14 @@ Royal Statistical Society: Series B}, 16(2), 175-185.
 \doi{10.1111/j.2517-6161.1954.tb00159.x}
 
 Finney, D. J. (1971). \emph{Probit analysis} (3rd ed.). Cambridge University Press.
+
+Judd, C. M., Westfall, J. and Kenny, D. A. (2017). Experiments with more than one random
+factor: Designs, analytic models, and statistical power. \emph{Annual Review of Psychology},
+68, 601-625. \doi{10.1146/annurev-psych-122414-033702}
+
+Westfall, J., Kenny, D. A. and Judd, C. M. (2014). Statistical power and optimal design in
+experiments in which samples of participants respond to samples of stimuli. \emph{Journal of
+Experimental Psychology: General}, 143(5), 2020-2045. \doi{10.1037/xge0000014}
 }
 \seealso{
 \code{\link[=target_n]{target_n()}} for the sample-size case, and \code{\link[=power_curve_mixed]{power_curve_mixed()}},

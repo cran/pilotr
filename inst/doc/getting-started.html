@@ -345,30 +345,30 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 <div id="one-specification-three-interfaces" class="section level2">
 <h2>One specification, three interfaces</h2>
 <p>pilotr is built around a portable design specification that fully
-describes a data-generating process and is consumed identically by three
-interfaces, namely a no-code web application, this R package and a
-Python package. The specification is the unit of reproducibility. It is
-a complete, executable description rather than a screenshot of a
-graphical interface or a language-specific script. You can place it
-under version control, attach it to a preregistration, share it with a
-collaborator and run it unchanged in R or Python to obtain identical
-data, bit for bit apart from a documented tolerance of a few units in
-the last place where an unrounded response family applies
-<code>exp()</code> or <code>log()</code> to the linear predictor (the
-cross-language vignette quantifies this).</p>
-<p>This vignette walks through the core loop of describe, simulate,
-inspect and export. The other vignettes, listed at the end, each go
-deeper into one part of the workflow.</p>
+describes a data-generating process. Three interfaces read it
+identically, namely a no-code web application, this R package and a
+Python package. The specification, an executable description of the
+design, is the unit of reproducibility. You can place it under version
+control, attach it to a preregistration, share it with a collaborator
+and run it unchanged in R or Python to obtain identical data. The data
+agree to the last bit wherever R and Python share a maths library, as on
+Linux, except in a rare Beta case under R 4.6.0 or later that the <a href="cross-language.html">cross-language vignette</a> describes.
+Elsewhere, a value that passes through <code>exp()</code>,
+<code>log()</code> or <code>pow()</code> can differ in its last bits,
+which the same vignette quantifies.</p>
+<p>This vignette covers the core workflow of describing, simulating,
+inspecting and exporting a design. Each of the other vignettes, listed
+at the end, covers one part of the workflow in more detail.</p>
 </div>
 <div id="describe-a-design" class="section level2">
 <h2>Describe a design</h2>
 <p>The specification is a small list serialised to JSON. You can write
 it by hand, point and click in the web application or build it from a
 flat set of inputs with <code>build_spec()</code>. The example below is
-a crossed psycholinguistic design. Subjects respond to items in a
-related or unrelated condition, with reaction time as the outcome,
-crossed by-subject and by-item random intercepts and slopes, and a small
-priming effect on the log scale.</p>
+a crossed psycholinguistic design in which subjects respond to items in
+a related or unrelated condition, with reaction time as the outcome. It
+has a small priming effect on the log scale and crossed by-subject and
+by-item random intercepts and slopes.</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>spec <span class="ot">&lt;-</span> <span class="fu">build_spec</span>(<span class="fu">list</span>(</span>
 <span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;priming&quot;</span>, <span class="at">seed =</span> <span class="dv">2024</span>,</span>
 <span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>  <span class="at">design_kind =</span> <span class="st">&quot;within&quot;</span>, <span class="at">include_items =</span> <span class="cn">TRUE</span>,</span>
@@ -379,8 +379,8 @@ priming effect on the log scale.</p>
 <span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>  <span class="at">item_int_sd =</span> <span class="fl">0.08</span>, <span class="at">item_slope_sd =</span> <span class="fl">0.02</span>, <span class="at">item_corr =</span> <span class="sc">-</span><span class="fl">0.1</span>,</span>
 <span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>  <span class="at">family =</span> <span class="st">&quot;shifted_lognormal&quot;</span>, <span class="at">resp_name =</span> <span class="st">&quot;RT&quot;</span>, <span class="at">sigma =</span> <span class="fl">0.30</span>, <span class="at">shift =</span> <span class="dv">200</span></span>
 <span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a>))</span></code></pre></div>
-<p>The portable artefact is plain JSON. This is exactly what the web
-application downloads and what the Python package reads.</p>
+<p>The JSON form of the specification is what the web application
+downloads and what the Python package reads.</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">spec_json</span>(spec))</span></code></pre></div>
 <pre><code>{
   &quot;spec_version&quot;: &quot;0.3&quot;,
@@ -438,10 +438,9 @@ application downloads and what the Python package reads.</p>
     &quot;shift&quot;: 200
   }
 }</code></pre>
-<p>You can read a specification back from a file (or string) with
-<code>load_spec()</code>, so a design authored anywhere runs everywhere.
-The full specification format, including every field and the
-cross-language RNG draw order, is documented in <a href="https://github.com/pablobernabeu/pilotr/blob/main/spec/SPEC.md"><code>spec/SPEC.md</code></a>.</p>
+<p>You can read a specification back from a file or a string with
+<code>load_spec()</code>. The specification format, including every
+field and the cross-language RNG draw order, is documented in <a href="https://github.com/pablobernabeu/pilotr/blob/main/spec/SPEC.md"><code>spec/SPEC.md</code></a>.</p>
 </div>
 <div id="simulate" class="section level2">
 <h2>Simulate</h2>
@@ -464,40 +463,102 @@ conditions (960 rows here).</p>
 </div>
 <div id="reproducible-by-construction" class="section level2">
 <h2>Reproducible by construction</h2>
-<p>pilotr ships a shared random-number generator, so the same
+<p>pilotr provides a shared random-number generator, so the same
 specification and seed produce the same data every time. This holds in
-the current R session, in a fresh one, in Python and on any machine.</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">isTRUE</span>(<span class="fu">all.equal</span>(<span class="fu">simulate_design</span>(spec), <span class="fu">simulate_design</span>(spec)))</span></code></pre></div>
+the current R session and in a fresh one on the same machine. In Python,
+and on another machine, it holds to the last bit wherever the maths
+library is the same, except in the rare Beta case under R 4.6.0 or
+later.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">identical</span>(<span class="fu">simulate_design</span>(spec), <span class="fu">simulate_design</span>(spec))</span></code></pre></div>
 <pre><code>[1] TRUE</code></pre>
-<p>Changing the seed changes the data, and leaving the specification
-unchanged leaves the data unchanged. The <a href="cross-language.html">cross-language vignette</a> describes how
-this holds across R and Python.</p>
+<p>Changing the seed changes the data. The <a href="cross-language.html">cross-language vignette</a> describes how
+reproducibility holds across R and Python.</p>
 </div>
 <div id="export-a-self-contained-script" class="section level2">
 <h2>Export a self-contained script</h2>
-<p><code>generate_r_script()</code> emits a stand-alone R script that
-embeds the specification and reproduces the design with no external
-files. This is convenient for an appendix or a preregistration.</p>
+<p><code>generate_r_script()</code> emits a stand-alone R script suited
+to an appendix or a preregistration. The script reproduces the design
+with no external files and embeds the specification as the JSON shown
+above, which <code>load_spec()</code> reads back to exactly the same
+numbers on any build of R.</p>
 <div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">generate_r_script</span>(spec))</span></code></pre></div>
 <pre><code># Reproducible simulation exported by pilotr.
-# install.packages(&quot;pilotr&quot;)   # once available; then run this script as-is.
+# install.packages(c(&quot;pilotr&quot;, &quot;lme4&quot;, &quot;lmerTest&quot;))   # from CRAN; lme4 and lmerTest only for power_mixed()
 library(pilotr)
 
-spec &lt;- list(spec_version = &quot;0.3&quot;, name = &quot;priming&quot;, seed = 2024L, units = list(subject = list(n = 24L), item = list(n = 20L)), factors = list(list(name = &quot;condition&quot;, levels = c(&quot;related&quot;, &quot;unrelated&quot;), contrasts = list(effect = c(-0.5, 0.5)), vary_within = c(&quot;subject&quot;, &quot;item&quot;))), fixed = list(intercept = 6, coefficients = list(effect = 0.05)), random = list(subject = list(intercept_sd = 0.12, slopes = list(effect = 0.04), correlations = list(`intercept,effect` = 0.2)), item = list(intercept_sd = 0.08, slopes = list(effect = 0.02), correlations = list(`intercept,effect` = -0.1))), response = list(family = &quot;shifted_lognormal&quot;, name = &quot;RT&quot;, sigma = 0.3, round = 4L, shift = 200))
+# The specification as spec_json() writes it. load_spec() reads it with jsonlite, which
+# recovers every number exactly on every build of R.
+spec &lt;- load_spec(r&quot;(
+{
+  &quot;spec_version&quot;: &quot;0.3&quot;,
+  &quot;name&quot;: &quot;priming&quot;,
+  &quot;seed&quot;: 2024,
+  &quot;units&quot;: {
+    &quot;subject&quot;: {
+      &quot;n&quot;: 24
+    },
+    &quot;item&quot;: {
+      &quot;n&quot;: 20
+    }
+  },
+  &quot;factors&quot;: [
+    {
+      &quot;name&quot;: &quot;condition&quot;,
+      &quot;levels&quot;: [&quot;related&quot;, &quot;unrelated&quot;],
+      &quot;contrasts&quot;: {
+        &quot;effect&quot;: [-0.5, 0.5]
+      },
+      &quot;vary_within&quot;: [&quot;subject&quot;, &quot;item&quot;]
+    }
+  ],
+  &quot;fixed&quot;: {
+    &quot;intercept&quot;: 6,
+    &quot;coefficients&quot;: {
+      &quot;effect&quot;: 0.05
+    }
+  },
+  &quot;random&quot;: {
+    &quot;subject&quot;: {
+      &quot;intercept_sd&quot;: 0.12,
+      &quot;slopes&quot;: {
+        &quot;effect&quot;: 0.04
+      },
+      &quot;correlations&quot;: {
+        &quot;intercept,effect&quot;: 0.2
+      }
+    },
+    &quot;item&quot;: {
+      &quot;intercept_sd&quot;: 0.08,
+      &quot;slopes&quot;: {
+        &quot;effect&quot;: 0.02
+      },
+      &quot;correlations&quot;: {
+        &quot;intercept,effect&quot;: -0.1
+      }
+    }
+  },
+  &quot;response&quot;: {
+    &quot;family&quot;: &quot;shifted_lognormal&quot;,
+    &quot;name&quot;: &quot;RT&quot;,
+    &quot;sigma&quot;: 0.3,
+    &quot;round&quot;: 4,
+    &quot;shift&quot;: 200
+  }
+}
+)&quot;)
 
 data &lt;- simulate_design(spec)              # analysis-ready data frame
 # write.csv(data, &quot;data.csv&quot;, row.names = FALSE)
-# pow  &lt;- power_mixed(spec, n_sims = 200)   # simulation-based power + Type S/M</code></pre>
+# pow &lt;- power_mixed(spec, n_sims = 200)   # needs lme4 and lmerTest</code></pre>
 </div>
 <div id="where-to-go-next" class="section level2">
 <h2>Where to go next</h2>
-<p>The remaining guides pick up where this one leaves off, taking the
-same specification through each response family, through power and
-precision analysis and out to the other interfaces that read it.</p>
 <ul>
 <li><a href="response-families.html">Response families</a>, covering
 Gaussian, reaction-time, accuracy, count, ordinal and proportion
 outcomes.</li>
+<li><a href="worked-examples.html">Worked examples</a>, which simulates
+each specification bundled with the package.</li>
 <li><a href="power-analysis.html">Power and design analysis</a>,
 covering simulation-based power with Type S and Type M errors, for
 two-group and crossed mixed-effects designs.</li>
@@ -505,8 +566,8 @@ two-group and crossed mixed-effects designs.</li>
 which plans by precision against a region of practical equivalence and
 sweeps sample size.</li>
 <li><a href="cross-language.html">Cross-language reproducibility</a>,
-describing the shared generator that makes R and Python agree to the
-last bit.</li>
+describing the shared generator that makes R and Python agree, and where
+their data can differ in the last bits.</li>
 <li><a href="the-no-code-app.html">The no-code app</a>, the
 point-and-click interface over the same specification, running in the
 browser or locally with <code>run_app()</code>.</li>

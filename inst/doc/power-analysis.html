@@ -347,19 +347,25 @@ an effect if the world matched the specification exactly. pilotr
 estimates this by repeatedly simulating from the ground-truth
 specification, fitting the analysis model and recording the proportion
 of significant results. Beyond power, it reports the design-analysis
-quantities of Gelman and Carlin (2014), namely the Type S (sign) error
-and the Type M (magnitude, or exaggeration) ratio.</p>
+quantities of <a href="https://doi.org/10.1177/1745691614551642">Gelman
+and Carlin (2014)</a>, namely the Type S (sign) error and the Type M
+(magnitude, or exaggeration) ratio.</p>
 <blockquote>
-<p>The mixed-effects examples below use small <code>n_sims</code>, and
-their results were precomputed with exactly the code shown and shipped
-with the package, so that the vignette builds quickly. For real
-planning, we recommend <code>n_sims &gt;= 200</code>, with more
-replicates for stable Type S and Type M estimates.</p>
+<p>To keep the vignette build quick, the mixed-effects analyses below
+whose results are shown use small <code>n_sims</code>, and their results
+were precomputed with exactly the code shown and included in the
+package. The other mixed-effects analyses are not run.
+<code>tools/vignette-caches.R</code> in the source repository
+regenerates the precomputed results, and a test there fails if the
+seeds, the simulated data or the code shown for them change and the
+results are not regenerated. For planning a study, we recommend
+<code>n_sims &gt;= 200</code>, with more replicates for stable Type S
+and Type M estimates.</p>
 </blockquote>
 <div id="two-group-gaussian" class="section level2">
 <h2>Two-group Gaussian</h2>
-<p>The classic case has a closed-form analytic power, which the
-simulation matches.</p>
+<p>This design has a closed-form power, which the simulation
+matches.</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>spec <span class="ot">&lt;-</span> <span class="fu">build_spec</span>(<span class="fu">list</span>(</span>
 <span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;two_group&quot;</span>, <span class="at">seed =</span> <span class="dv">1</span>, <span class="at">design_kind =</span> <span class="st">&quot;between&quot;</span>, <span class="at">n_subject =</span> <span class="dv">64</span>,</span>
 <span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>  <span class="at">factor_name =</span> <span class="st">&quot;group&quot;</span>, <span class="at">lev1 =</span> <span class="st">&quot;control&quot;</span>, <span class="at">lev2 =</span> <span class="st">&quot;treatment&quot;</span>,</span>
@@ -373,125 +379,475 @@ simulation matches.</p>
 <p>At roughly 50% power, the Type M ratio is well above 1. Conditional
 on significance, the estimated effect is exaggerated, even though the
 average estimate over all replicates is unbiased. This reflects the
-statistical-significance filter, which is precisely what design analysis
-is meant to expose.</p>
+statistical-significance filter that design analysis is meant to
+expose.</p>
+</div>
+<div id="directional-predictions" class="section level2">
+<h2>Directional predictions</h2>
+<p>A preregistration that predicts the direction of an effect can test
+it one-sided. In <code>power_design()</code>, <code>power_mixed()</code>
+and <code>power_curve_mixed()</code>,
+<code>alternative = &quot;greater&quot;</code> tests whether the effect is
+positive and <code>alternative = &quot;less&quot;</code> whether it is negative.
+Here the treatment group is predicted to score higher than the control
+group.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>pw_greater <span class="ot">&lt;-</span> <span class="fu">power_design</span>(spec, <span class="at">n_sims =</span> <span class="dv">500</span>, <span class="at">alternative =</span> <span class="st">&quot;greater&quot;</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="fu">unlist</span>(pw_greater[<span class="fu">c</span>(<span class="st">&quot;power&quot;</span>, <span class="st">&quot;type_s&quot;</span>, <span class="st">&quot;type_m&quot;</span>)])</span></code></pre></div>
+<pre><code>   power   type_s   type_m 
+0.616000 0.000000 1.315194 </code></pre>
+<p>The one-sided p-value comes from the same t as the two-sided one, and
+it is half the two-sided p-value when the estimate lies in the predicted
+direction. A one-sided test at α = 0.05 therefore rejects in exactly the
+replicates in which the two-sided test at 0.10 rejects with the estimate
+in that direction. Its power of 0.616 exceeds the two-sided 0.504 above.
+Type S and Type M are taken over the replicates significant in the
+predicted direction. Type S is therefore 0 by construction, and Type M,
+1.32, is the exaggeration among the replicates that would support the
+prediction. In the direction of the true effect, a one-sided power at α
+is the two-sided power at 2α times one minus the Type S at 2α.</p>
 </div>
 <div id="crossed-mixed-effects-designs" class="section level2">
 <h2>Crossed mixed-effects designs</h2>
-<p>A feature that distinguishes pilotr from a marginal simulator is
-power estimation for crossed by-subject and by-item designs. The R
-interface fits the maximal model
-<code>y ~ cond + (1 + cond | subject) + (1 + cond | item)</code> with
-<code>lme4</code>/<code>lmerTest</code> and tests the fixed effect with
-Satterthwaite degrees of freedom.</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>spec_c <span class="ot">&lt;-</span> <span class="fu">build_spec</span>(<span class="fu">list</span>(</span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;priming&quot;</span>, <span class="at">seed =</span> <span class="dv">1</span>, <span class="at">design_kind =</span> <span class="st">&quot;within&quot;</span>, <span class="at">include_items =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="at">n_subject =</span> <span class="dv">24</span>, <span class="at">n_item =</span> <span class="dv">18</span>,</span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">factor_name =</span> <span class="st">&quot;condition&quot;</span>, <span class="at">lev1 =</span> <span class="st">&quot;related&quot;</span>, <span class="at">lev2 =</span> <span class="st">&quot;unrelated&quot;</span>,</span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="at">intercept =</span> <span class="dv">6</span>, <span class="at">effect =</span> <span class="fl">0.06</span>,</span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  <span class="at">subj_int_sd =</span> <span class="fl">0.12</span>, <span class="at">subj_slope_sd =</span> <span class="fl">0.04</span>, <span class="at">subj_corr =</span> <span class="fl">0.2</span>,</span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>  <span class="at">item_int_sd =</span> <span class="fl">0.08</span>, <span class="at">item_slope_sd =</span> <span class="fl">0.02</span>, <span class="at">item_corr =</span> <span class="sc">-</span><span class="fl">0.1</span>,</span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>  <span class="at">family =</span> <span class="st">&quot;shifted_lognormal&quot;</span>, <span class="at">resp_name =</span> <span class="st">&quot;RT&quot;</span>, <span class="at">sigma =</span> <span class="fl">0.3</span>, <span class="at">shift =</span> <span class="dv">200</span>))</span></code></pre></div>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># A tiny replicate count keeps the vignette fast. Use 200 or more for real planning.</span></span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>pm <span class="ot">&lt;-</span> <span class="fu">power_mixed</span>(spec_c, <span class="at">n_sims =</span> <span class="dv">20</span>)</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="fu">unlist</span>(pm[<span class="fu">c</span>(<span class="st">&quot;power&quot;</span>, <span class="st">&quot;type_s&quot;</span>, <span class="st">&quot;type_m&quot;</span>, <span class="st">&quot;n_converged&quot;</span>)])</span></code></pre></div>
-<pre><code>      power      type_s      type_m n_converged 
-   0.800000    0.000000    1.193659   20.000000 </code></pre>
-<p><code>n_converged</code> reports how many replicates the maximal
-model actually fit. This is a useful diagnostic in its own right, since
-convergence problems are common in small crossed designs, and it is the
-denominator of <code>power</code>, which is the significant proportion
-among the converged replicates.</p>
-<p><code>power_mixed()</code> carries its own simulation loop over the
-portable specification, with no other power package underneath it. It
-covers territory pioneered by <a href="https://doi.org/10.1111/2041-210x.12504">simr</a> (Green and
-MacLeod, 2016) and <a href="https://doi.org/10.3758/s13428-021-01546-0">mixedpower</a> (Kumle,
-Vo and Draschkow, 2021). pilotr differs in being driven by the
-cross-language specification, in reporting Type S and Type M errors
-alongside power and in built-in parallelisation.</p>
+<p>pilotr estimates power for crossed by-subject and by-item designs.
+The R interface derives the analysis model from the specification, fits
+it with <code>lme4</code>/<code>lmerTest</code> and tests each fixed
+effect with Satterthwaite degrees of freedom.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>spec_c <span class="ot">&lt;-</span> <span class="fu">build_spec</span>(<span class="fu">list</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">&quot;priming&quot;</span>, <span class="at">seed =</span> <span class="dv">1</span>, <span class="at">design_kind =</span> <span class="st">&quot;within&quot;</span>, <span class="at">include_items =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">n_subject =</span> <span class="dv">24</span>, <span class="at">n_item =</span> <span class="dv">18</span>,</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">factor_name =</span> <span class="st">&quot;condition&quot;</span>, <span class="at">lev1 =</span> <span class="st">&quot;related&quot;</span>, <span class="at">lev2 =</span> <span class="st">&quot;unrelated&quot;</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="at">intercept =</span> <span class="dv">6</span>, <span class="at">effect =</span> <span class="fl">0.06</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="at">subj_int_sd =</span> <span class="fl">0.12</span>, <span class="at">subj_slope_sd =</span> <span class="fl">0.04</span>, <span class="at">subj_corr =</span> <span class="fl">0.2</span>,</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>  <span class="at">item_int_sd =</span> <span class="fl">0.08</span>, <span class="at">item_slope_sd =</span> <span class="fl">0.02</span>, <span class="at">item_corr =</span> <span class="sc">-</span><span class="fl">0.1</span>,</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>  <span class="at">family =</span> <span class="st">&quot;shifted_lognormal&quot;</span>, <span class="at">resp_name =</span> <span class="st">&quot;RT&quot;</span>, <span class="at">sigma =</span> <span class="fl">0.3</span>, <span class="at">shift =</span> <span class="dv">200</span>))</span></code></pre></div>
+<p>The priming design above is fully crossed, so each of the 24 subjects
+sees all 18 items in both conditions, 864 trials in all. A
+counterbalanced study, in which each subject sees each item in one
+condition only, has half the observations and lower power. Plan such a
+study by adding <code>counterbalance = TRUE</code> to the
+<code>build_spec()</code> call above. The factor <code>condition</code>
+then sets <code>counterbalance</code>, a field of specification version
+0.4 that rotates the conditions over subjects and items as a Latin
+square does (see <a href="https://github.com/pablobernabeu/pilotr/blob/main/spec/SPEC.md#counterbalanced-lists">counterbalanced
+lists</a>). For releases that read no version above 0.3, the two-list
+encoding among the <a href="https://github.com/pablobernabeu/pilotr/blob/main/spec/SPEC.md#worked-encodings">worked
+encodings</a> of the specification expresses the same design.</p>
+<p>The model fitted to each replicate is the one the specification
+implies, here the maximal model for the design, with by-subject and
+by-item intercepts and slopes for the condition.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">model_formula</span>(spec_c)</span></code></pre></div>
+<pre><code>.y ~ effect + (1 + effect | subject) + (1 + effect | item)</code></pre>
+<p><code>effect</code> is the contrast column that
+<code>model_data()</code> adds for the condition, coded −0.5 for related
+and 0.5 for unrelated, so its coefficient is the unrelated condition
+minus the related one. <code>.y</code> is the response on the scale of
+the specification’s coefficients, which for this shifted lognormal
+response is log(RT − 200), the logarithm of the reaction time less its
+shift.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># A tiny replicate count keeps the vignette fast. Use 200 or more for real planning.</span></span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>pm <span class="ot">&lt;-</span> <span class="fu">power_mixed</span>(spec_c, <span class="at">n_sims =</span> <span class="dv">20</span>)</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>pm</span></code></pre></div>
+<pre><code>Simulation-based power over 20 replicates (alpha = 0.05)
+  fitter: lmerTest::lmer, Satterthwaite t
+  fits: 20 attempted, 20 returned, 8 converged cleanly, 12 singular, 0 with warnings
+  note: many fits were boundary-singular, so this model is richer than the design supports
+ effect true power  mcse           ci95 n_sig
+ effect 0.06   0.8 0.089 [0.584, 0.919]    16
+  Type S and Type M, over the significant replicates:
+ effect type_s    type_s_ci95 type_m type_m_mcse
+ effect      0 [0.000, 0.194]  1.202       0.068</code></pre>
+<p><code>power</code> is the proportion of significant results among the
+replicates that returned an estimate, which the result counts as
+<code>n_returned</code>, here 20 of 20. The remaining counts describe
+the fits without entering <code>power</code>. <code>n_converged</code>
+counts the fits that returned an estimate with neither a warning nor a
+singular fit, 8 here, and <code>n_singular</code> those whose variance
+estimates sat on a boundary, 12 here. Singular and warning fits are kept
+in <code>power</code>, since their fixed-effect estimates remain
+interpretable and discarding them would bias the result. A large
+<code>n_singular</code> indicates that the model is richer than the
+design can support at this sample size. Such a count is common in small
+crossed designs and worth reporting beside the power.</p>
+<p><code>power_mixed()</code> runs its own simulation loop over the
+portable specification and does not depend on another power package. The
+packages <a href="https://doi.org/10.1111/2041-210x.12504">simr</a>
+(Green and MacLeod, 2016) and <a href="https://doi.org/10.3758/s13428-021-01546-0">mixedpower</a> (Kumle,
+Võ and Draschkow, 2021) offer simulation-based power analysis for
+mixed-effects models. pilotr differs from them in using the
+cross-language specification and in reporting Type S and Type M
+alongside power.</p>
+</div>
+<div id="a-preregistered-simplification-rule" class="section level2">
+<h2>A preregistered simplification rule</h2>
+<p>The power above is that of an analysis that keeps the maximal model
+in every replicate, including singular fits and fits with a warning.
+Many analysis plans preregister a rule instead: fit the maximal model,
+and when the fit is singular, drop the correlations between the random
+effects, then the slopes (<a href="https://doi.org/10.1016/j.jml.2017.01.001">Matuschek et al.,
+2017</a>). <a href="https://doi.org/10.1016/j.jml.2012.11.001">Barr et
+al. (2013)</a> recommend the maximal model and suggest dropping its
+correlations when it fails to converge. Each replicate is then analysed
+with a model that depends on its data, so the rule has a power and a
+Type I error rate of its own. <code>model_formula()</code> builds the
+two simpler models: <code>&quot;zcp&quot;</code>, the zero-correlation model, and
+<code>&quot;intercepts&quot;</code>, with random intercepts alone.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">model_formula</span>(spec_c, <span class="st">&quot;zcp&quot;</span>)</span></code></pre></div>
+<pre><code>.y ~ effect + (1 + effect || subject) + (1 + effect || item)</code></pre>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">model_formula</span>(spec_c, <span class="st">&quot;intercepts&quot;</span>)</span></code></pre></div>
+<pre><code>.y ~ effect + (1 | subject) + (1 | item)</code></pre>
+<p>Given the names of the three models as <code>formula</code>,
+<code>power_mixed()</code> and <code>precision_design()</code> fit them
+to each replicate in turn, as the rungs of a ladder. Each replicate
+keeps the first fit that is not singular, or the intercepts-only fit
+when every rung is singular, and <code>fallback = &quot;warning&quot;</code> also
+moves on from a fit with a convergence warning. The result gives the
+share of the replicates analysed at each rung, and its fit counts
+describe the fits that were kept.</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>pm_rule <span class="ot">&lt;-</span> <span class="fu">power_mixed</span>(spec_c, <span class="at">formula =</span> <span class="fu">c</span>(<span class="st">&quot;maximal&quot;</span>, <span class="st">&quot;zcp&quot;</span>, <span class="st">&quot;intercepts&quot;</span>),</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>                       <span class="at">fallback =</span> <span class="st">&quot;singular&quot;</span>, <span class="at">n_sims =</span> <span class="dv">200</span>)</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>pm_rule<span class="sc">$</span>rung_shares</span></code></pre></div>
+<p>When the rule ends on random intercepts alone, the model ignores how
+much the effect varies over subjects and items, and a test that ignores
+that variation rejects a true null hypothesis too often (Barr et al.,
+2013). To see how often, run the null condition through the same ladder.
+<code>design_conditions()</code> puts the null condition first.</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="fu">sweep_spec</span>(spec_c, <span class="st">&quot;fixed$coefficients&quot;</span>, <span class="fu">design_conditions</span>(<span class="at">effect =</span> <span class="fl">0.06</span>),</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>           power_mixed, <span class="at">formula =</span> <span class="fu">c</span>(<span class="st">&quot;maximal&quot;</span>, <span class="st">&quot;zcp&quot;</span>, <span class="st">&quot;intercepts&quot;</span>), <span class="at">n_sims =</span> <span class="dv">200</span>)</span></code></pre></div>
+<p><code>tools/calibration/simplification_rule.R</code> in the source
+repository runs these replicates, 200 in each condition, and analyses
+each of them with the maximal model, with the rule and with random
+intercepts alone. With the effect, the maximal model was singular in 152
+of the 200 replicates. The rule kept the maximal fit in the other 48,
+and of the 152 it kept the zero-correlation fit in 23 and the
+intercepts-only fit in 129. It raised power from 0.69 to 0.735, each
+with a Monte Carlo standard error of about 0.03. Random intercepts alone
+gave 0.835, but part of that gain came from standard errors that were
+too small. Relative to the spread of its estimates, the intercepts-only
+model reported standard errors about 15% smaller than the maximal model
+did, in both conditions.</p>
+<p>In the null condition, the three analyses rejected in 2, 3 and 6 of
+the 200 replicates, where a test at its nominal level would reject in
+10. The slopes of this design are small beside its residual variation,
+which leaves the intercepts-only model little to ignore. Where the
+effect varies more over subjects or items, the intercepts-only model
+ignores more, and the null condition shows what that costs.</p>
+</div>
+<div id="which-model-each-family-gets" class="section level2">
+<h2>Which model each family gets</h2>
+<p><code>power_mixed()</code> and <code>precision_design()</code> choose
+the fitter by the response family, so that the estimates are on the
+scale the specification’s coefficients are written on. The mean
+estimate, Type M and the region of practical equivalence then compare
+like with like. A model without random effects, such as that of a
+between-subjects design with one row per subject, is fitted by
+<code>lm()</code> or <code>glm()</code>. Each result names its fitter
+and test in <code>fitter</code>.</p>
+<table>
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Family</th>
+<th>R <code>power_mixed()</code></th>
+<th>R <code>precision_design()</code></th>
+<th>Python <code>power_mixed</code></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>gaussian</code>, <code>exgaussian</code></td>
+<td><code>lmerTest::lmer()</code>, Satterthwaite <em>t</em></td>
+<td><code>lme4::lmer()</code>, Wald interval</td>
+<td>MixedLM, Wald <em>z</em></td>
+</tr>
+<tr class="even">
+<td><code>lognormal</code>, <code>shifted_lognormal</code></td>
+<td>as above, on the log scale</td>
+<td>as above, on the log scale</td>
+<td>MixedLM on the log scale, Wald <em>z</em></td>
+</tr>
+<tr class="odd">
+<td><code>bernoulli</code></td>
+<td><code>lme4::glmer()</code>, binomial, Wald <em>z</em></td>
+<td><code>lme4::glmer()</code>, Wald interval on the logit scale</td>
+<td>linear model on the response scale, a warning, no mean estimate or
+Type M, and no Type S for an interaction</td>
+</tr>
+<tr class="even">
+<td><code>poisson</code></td>
+<td><code>lme4::glmer()</code>, Poisson, Wald <em>z</em></td>
+<td><code>lme4::glmer()</code>, Wald interval on the log scale</td>
+<td>as for <code>bernoulli</code></td>
+</tr>
+<tr class="odd">
+<td><code>ordinal</code>, <code>beta</code></td>
+<td>linear model on the response scale, a warning, no mean estimate or
+Type M, and no Type S for an interaction</td>
+<td>linear model on the response scale, a warning, no ROPE decisions
+(the interval width stays)</td>
+<td>as for <code>bernoulli</code></td>
+</tr>
+</tbody>
+</table>
+<p>A Wald <em>z</em> treats the variance components as known. It is the
+test <a href="https://doi.org/10.1016/j.tree.2008.10.008">Bolker et
+al. (2009)</a> recommend for the fixed effects of a GLMM without
+overdispersion. With few subjects or items, however, it rejects more
+often than its nominal level (<a href="https://doi.org/10.1186/s12874-015-0026-x">Li and Redden,
+2015</a>), so the power of a small accuracy or count design is somewhat
+overstated.</p>
+<p>Ordinal and Beta outcomes have no frequentist model on the logit
+scale here yet, so their power is that of the linear model’s test and
+their Type S compares signs alone. A bounded response compresses
+differences near the ends of its range, so an interaction can change
+sign between the two scales, and the result gives no Type S for it.
+<code>generate_design_analysis()</code> writes a Bayesian design
+analysis for them, on the logit scale of their coefficients.</p>
+<p>Python’s <code>power_mixed</code> fits the model the specification
+implies, from ports of <code>model_formula()</code> and
+<code>model_data()</code>. It fits every random effect as an independent
+variance component, so it leaves out the correlations that
+<code>lme4</code> estimates here. It raises an error for a design
+without random effects, as its own guide describes.</p>
 </div>
 <div id="a-power-curve" class="section level2">
 <h2>A power curve</h2>
-<p>The following sweep over the number of subjects reports power at each
-size.</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>curve <span class="ot">&lt;-</span> <span class="fu">power_curve_mixed</span>(</span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  spec_c,</span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="at">subject_ns =</span> <span class="fu">c</span>(<span class="dv">8</span>, <span class="dv">12</span>, <span class="dv">16</span>, <span class="dv">24</span>, <span class="dv">32</span>, <span class="dv">44</span>, <span class="dv">56</span>),</span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="at">n_sims =</span> <span class="dv">50</span>)</span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>curve</span></code></pre></div>
-<pre><code>  n_subject power   type_m n_converged
-1         8  0.16 1.998682          50
-2        12  0.34 1.639186          50
-3        16  0.48 1.404611          50
-4        24  0.80 1.189207          50
-5        32  0.86 1.129062          50
-6        44  0.96 1.046713          50
-7        56  0.96 1.048449          50</code></pre>
+<p><code>power_curve_mixed()</code> sweeps the number of subjects and
+reports power at each size.</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>curve <span class="ot">&lt;-</span> <span class="fu">power_curve_mixed</span>(</span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>  spec_c,</span>
+<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a>  <span class="at">subject_ns =</span> <span class="fu">c</span>(<span class="dv">8</span>, <span class="dv">12</span>, <span class="dv">16</span>, <span class="dv">24</span>, <span class="dv">32</span>, <span class="dv">44</span>, <span class="dv">56</span>),</span>
+<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a>  <span class="at">n_sims =</span> <span class="dv">50</span>)</span>
+<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a><span class="fu">print</span>(curve[, <span class="fu">c</span>(<span class="st">&quot;n_subject&quot;</span>, <span class="st">&quot;power&quot;</span>, <span class="st">&quot;power_lo&quot;</span>, <span class="st">&quot;power_hi&quot;</span>, <span class="st">&quot;type_m&quot;</span>,</span>
+<span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a>                <span class="st">&quot;n_returned&quot;</span>, <span class="st">&quot;n_converged&quot;</span>, <span class="st">&quot;n_singular&quot;</span>)], <span class="at">digits =</span> <span class="dv">3</span>)</span></code></pre></div>
+<pre><code>  n_subject power power_lo power_hi type_m n_returned n_converged n_singular
+1         8  0.16   0.0834    0.285   1.80         50           7         42
+2        12  0.28   0.1747    0.417   1.57         50           6         44
+3        16  0.42   0.2938    0.558   1.36         50          14         34
+4        24  0.68   0.5419    0.792   1.17         50          10         40
+5        32  0.76   0.6259    0.857   1.19         50          13         37
+6        44  0.86   0.7381    0.930   1.06         50          15         35
+7        56  0.94   0.8378    0.979   1.04         50          26         24</code></pre>
+<p>The curve has a row for each sample size, with the power, Type S,
+Type M and fit counts that <code>power_mixed()</code> reports, and the
+table shows some of its columns. <code>power_lo</code> and
+<code>power_hi</code> bound the 95% Wilson interval of each power
+estimate, and the fit counts read as they do above, with
+<code>n_returned</code> the denominator of power.</p>
+<p>Each point of the curve draws its own replicates. Point <em>j</em> of
+a sweep over <em>J</em> sizes takes
+<code>replicate_seeds(seed, J)[j]</code> as its seed, so no two points
+share their random numbers. <code>target_n()</code> assumes this when it
+fits the curve below. <code>seeds = &quot;shared&quot;</code> gives every point
+the specification’s own seed instead.</p>
 </div>
 <div id="the-sample-size-the-curve-implies" class="section level2">
 <h2>The sample size the curve implies</h2>
-<p>The curve is a means to an end. What the analysis is run for is the
-sample size at which power reaches the target, and that is the number a
-preregistration quotes. Reading it off the table or the plot judges
-points whose Monte Carlo intervals overlap, and yields a bare figure
-with no interval attached to it. <code>target_n()</code> fits the curve
-and inverts the fit, so the crossing is estimated, and arrives with the
-uncertainty a simulated curve carries.</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>solved <span class="ot">&lt;-</span> <span class="fu">target_n</span>(curve, <span class="at">target =</span> <span class="fl">0.8</span>)</span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">unlist</span>(solved[<span class="fu">c</span>(<span class="st">&quot;n&quot;</span>, <span class="st">&quot;n_lo&quot;</span>, <span class="st">&quot;n_hi&quot;</span>)])</span></code></pre></div>
+<p>The purpose of a power curve is to find the sample size at which
+power reaches the target, and that size is the number a preregistration
+quotes. Reading it off the table or the plot means judging points whose
+Monte Carlo intervals overlap, and it gives a figure without an
+interval. <code>target_n()</code> fits the curve and inverts the fit. It
+estimates the crossing together with the uncertainty that a simulated
+curve carries.</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>solved <span class="ot">&lt;-</span> <span class="fu">target_n</span>(curve, <span class="at">target =</span> <span class="fl">0.8</span>)</span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a><span class="fu">unlist</span>(solved[<span class="fu">c</span>(<span class="st">&quot;n&quot;</span>, <span class="st">&quot;n_lo&quot;</span>, <span class="st">&quot;n_hi&quot;</span>)])</span></code></pre></div>
 <pre><code>   n n_lo n_hi 
-  29   25   33 </code></pre>
-<p>Fifty replicates per point is few, and the interval says so. The fit
-is a binomial regression of power on the square root of the sample size,
-weighted by the replicates behind each point, and the interval is the
-delta-method interval that <code>MASS::dose.p()</code> computes for a
-fitted <code>glm</code>. Nothing is extrapolated: a curve that never
-reaches the target within the sizes swept is refused, and the refusal
-reports the range the sweep did cover.</p>
+  36   32   41 </code></pre>
+<p>Fifty replicates per point is few, and the interval is wide
+accordingly. The fit is a binomial regression of power on the square
+root of the sample size, weighted by the replicates behind each point,
+and the interval is the delta-method interval that
+<code>MASS::dose.p()</code> computes for a fitted <code>glm</code>.
+<code>target_n()</code> does not extrapolate. For a curve that never
+reaches the target within the sizes swept, it stops with an error that
+reports the range the sweep covered.</p>
 <p>For a curve swept over something other than sample size,
 <code>solve_curve()</code> is the general form, with
 <code>transform = &quot;identity&quot;</code> where the axis is an effect
 size.</p>
-<p>Plotting the curve and the solved size together shows what the solve
-has done.</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="co"># The transparent device canvas is what lets the page colour through. A ggplot</span></span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="co"># theme alone cannot do it, since the device paints white underneath. The</span></span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="co"># website&#39;s dark mode then inverts the figure&#39;s ink, so the axes and labels</span></span>
-<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="co"># follow the theme and the figure carries no opaque matte.</span></span>
-<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
-<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a><span class="co"># Each power estimate is a proportion over the converged replicates, so it</span></span>
-<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a><span class="co"># carries a binomial Monte Carlo standard error. The shaded band is the 95%</span></span>
-<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a><span class="co"># interval.</span></span>
-<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>curve<span class="sc">$</span>se <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(curve<span class="sc">$</span>power <span class="sc">*</span> (<span class="dv">1</span> <span class="sc">-</span> curve<span class="sc">$</span>power) <span class="sc">/</span> curve<span class="sc">$</span>n_converged)</span>
-<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a><span class="fu">ggplot</span>(curve, <span class="fu">aes</span>(n_subject, power)) <span class="sc">+</span></span>
-<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>  <span class="fu">geom_hline</span>(<span class="at">yintercept =</span> <span class="fl">0.8</span>, <span class="at">linetype =</span> <span class="dv">2</span>, <span class="at">colour =</span> <span class="st">&quot;grey60&quot;</span>) <span class="sc">+</span></span>
-<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>  <span class="co"># The solved sample size and its interval. The dashed horizontal line marks</span></span>
-<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a>  <span class="co"># the target and the band marks where the curve reaches it.</span></span>
-<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a>  <span class="fu">annotate</span>(<span class="st">&quot;rect&quot;</span>, <span class="at">xmin =</span> solved<span class="sc">$</span>lo, <span class="at">xmax =</span> solved<span class="sc">$</span>hi, <span class="at">ymin =</span> <span class="sc">-</span><span class="cn">Inf</span>, <span class="at">ymax =</span> <span class="cn">Inf</span>,</span>
-<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a>           <span class="at">fill =</span> <span class="st">&quot;grey60&quot;</span>, <span class="at">alpha =</span> .<span class="dv">15</span>) <span class="sc">+</span></span>
-<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a>  <span class="fu">geom_vline</span>(<span class="at">xintercept =</span> solved<span class="sc">$</span>value, <span class="at">linetype =</span> <span class="dv">2</span>, <span class="at">colour =</span> <span class="st">&quot;grey60&quot;</span>) <span class="sc">+</span></span>
-<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a>  <span class="fu">geom_ribbon</span>(<span class="fu">aes</span>(<span class="at">ymin =</span> <span class="fu">pmax</span>(<span class="dv">0</span>, power <span class="sc">-</span> <span class="fl">1.96</span> <span class="sc">*</span> se),</span>
-<span id="cb11-18"><a href="#cb11-18" tabindex="-1"></a>                  <span class="at">ymax =</span> <span class="fu">pmin</span>(<span class="dv">1</span>, power <span class="sc">+</span> <span class="fl">1.96</span> <span class="sc">*</span> se)),</span>
-<span id="cb11-19"><a href="#cb11-19" tabindex="-1"></a>              <span class="at">alpha =</span> .<span class="dv">15</span>, <span class="at">fill =</span> <span class="st">&quot;#2C6FB0&quot;</span>) <span class="sc">+</span></span>
-<span id="cb11-20"><a href="#cb11-20" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="at">colour =</span> <span class="st">&quot;#2C6FB0&quot;</span>, <span class="at">linewidth =</span> <span class="fl">0.8</span>) <span class="sc">+</span></span>
-<span id="cb11-21"><a href="#cb11-21" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">colour =</span> <span class="st">&quot;#2C6FB0&quot;</span>, <span class="at">size =</span> <span class="fl">2.6</span>) <span class="sc">+</span></span>
-<span id="cb11-22"><a href="#cb11-22" tabindex="-1"></a>  <span class="fu">scale_y_continuous</span>(<span class="at">limits =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">1</span>)) <span class="sc">+</span></span>
-<span id="cb11-23"><a href="#cb11-23" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="fu">expression</span>(<span class="fu">italic</span>(N) <span class="sc">~</span> <span class="st">&quot;subjects&quot;</span>), <span class="at">y =</span> <span class="st">&quot;Power&quot;</span>) <span class="sc">+</span></span>
-<span id="cb11-24"><a href="#cb11-24" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">12</span>) <span class="sc">+</span></span>
-<span id="cb11-25"><a href="#cb11-25" tabindex="-1"></a>  <span class="co"># theme_minimal still paints a white plot.background over the transparent</span></span>
-<span id="cb11-26"><a href="#cb11-26" tabindex="-1"></a>  <span class="co"># canvas, so both surfaces have to be cleared for the page colour to reach the</span></span>
-<span id="cb11-27"><a href="#cb11-27" tabindex="-1"></a>  <span class="co"># figure. The ink is left at its default, because the website inverts the</span></span>
-<span id="cb11-28"><a href="#cb11-28" tabindex="-1"></a>  <span class="co"># figure in dark mode, which turns the dark axis text light, whereas a fixed</span></span>
-<span id="cb11-29"><a href="#cb11-29" tabindex="-1"></a>  <span class="co"># mid-grey would be inverted into a muddy tan.</span></span>
-<span id="cb11-30"><a href="#cb11-30" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">plot.background  =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">colour =</span> <span class="cn">NA</span>),</span>
-<span id="cb11-31"><a href="#cb11-31" tabindex="-1"></a>        <span class="at">panel.background =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">colour =</span> <span class="cn">NA</span>),</span>
-<span id="cb11-32"><a href="#cb11-32" tabindex="-1"></a>        <span class="at">panel.grid       =</span> <span class="fu">element_line</span>(<span class="at">colour =</span> <span class="st">&quot;grey80&quot;</span>))</span></code></pre></div>
-<p><img role="img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAkAAAAFZCAMAAABHdWDKAAAA2FBMVEX9/v0AAAAAADkAAGUAOY8AZmUAZrUsb7A5AAA5ADk5AGU5j7U5j9pNTU1NTW5NTY1Nbm5NbqpNjcdlAABlADllj49ltbVltf1uTU1uTW5uTY1ubk1ubqpujY1uq+KJk5yNTU2NTW6NTY2NbqqNyP2POQCPj2WP2/2ZmZmqbk2qbm6qbo2q4/2tt8G0vsi1ZgC1/rW1/v3ExMTHjU3H46rH/v3MzMzR3OXajzna/v3e6fLiq27iyMfi/v3u7+79tWX9yI3924/946r9/rX9/sf9/tr9/uL9/v3FTu52AAAASHRSTlP//////////////////////////////////////////////////////////////////////////////////////////////wCc7PJgAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAU4klEQVR4nO3dC3vTyBUG4DVQQlvMlqQtt102oaEs1JsU0pTgbEpwTPz//1F1s6zL3I7mnJmR8p2H3RjzeTySX0Yj22h+2KBQHvVD7A6gxl0AhPIqAEJ5FQChvAqAUF4FQCivCgTov2nl//fpf7RS5hn7n9oOcs8DkLp+BSC3AiAA8soDEAB55QEIgLzyAORUAKQrAAIgrzwAAZBXHoAAyCsPQOrCJNqxLIBWL8/LG7fv5z+e1z/Ilcz2lgVAbHkzoPXhlsvZfv5r+4NcyWxvWQDEljcCupz/XI1A66NFPhpVP4idofQnTB6A2PJGQL9fbbXkPzM91Y/6WcZan1gqfL9PwpeuK06AdnMgNSD3SuYvTFkjOwtb9utEcZ+pBudtHQegZAHJgAAgjnzKgIRBUPO2jjsCwiRaGFAwENS8reOu7wPhNF4EUHgQ1LxtC1wAnb3O3xEq3kGsfpALgJoVEwQ1b9uV+CgjGCD/F3hvzx8EMb+3Z9mVAORUHoDYXuC9ojxB0PLlUxp3JQDJACK+XgBkqbsCaOjr5fCAvXhl2pUAxABoiAcAItXoADlMoj97eSA9oPFiDnwCHMJY856APpfF+HrpH7CTA0Dp5AcD+twsxtdL/YDusIPT+FTydECfFcX4evUe0LXj+wR4I5E1T5lEF1Z+CwnIhmfIEwAQa94JUNNKMEAOdgY9AQCx5i2A+lZC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" /><!-- --></p>
+<p>Plotting the curve and the solved size together shows what
+<code>target_n()</code> has done.</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a><span class="co"># The transparent device canvas is what lets the page colour through. A ggplot</span></span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a><span class="co"># theme alone cannot do it, since the device paints white underneath. The</span></span>
+<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a><span class="co"># website&#39;s dark mode then inverts the figure&#39;s ink, so the axes and labels</span></span>
+<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a><span class="co"># follow the theme and the figure carries no opaque matte.</span></span>
+<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb21-6"><a href="#cb21-6" tabindex="-1"></a><span class="co"># Each power estimate is a proportion over the replicates that returned an</span></span>
+<span id="cb21-7"><a href="#cb21-7" tabindex="-1"></a><span class="co"># estimate, and the curve carries its 95% Wilson interval, which the shaded</span></span>
+<span id="cb21-8"><a href="#cb21-8" tabindex="-1"></a><span class="co"># band draws.</span></span>
+<span id="cb21-9"><a href="#cb21-9" tabindex="-1"></a><span class="fu">ggplot</span>(curve, <span class="fu">aes</span>(n_subject, power)) <span class="sc">+</span></span>
+<span id="cb21-10"><a href="#cb21-10" tabindex="-1"></a>  <span class="fu">geom_hline</span>(<span class="at">yintercept =</span> <span class="fl">0.8</span>, <span class="at">linetype =</span> <span class="dv">2</span>, <span class="at">colour =</span> <span class="st">&quot;grey60&quot;</span>) <span class="sc">+</span></span>
+<span id="cb21-11"><a href="#cb21-11" tabindex="-1"></a>  <span class="co"># The solved sample size and its interval. The dashed horizontal line marks</span></span>
+<span id="cb21-12"><a href="#cb21-12" tabindex="-1"></a>  <span class="co"># the target and the band marks where the curve reaches it.</span></span>
+<span id="cb21-13"><a href="#cb21-13" tabindex="-1"></a>  <span class="fu">annotate</span>(<span class="st">&quot;rect&quot;</span>, <span class="at">xmin =</span> solved<span class="sc">$</span>lo, <span class="at">xmax =</span> solved<span class="sc">$</span>hi, <span class="at">ymin =</span> <span class="sc">-</span><span class="cn">Inf</span>, <span class="at">ymax =</span> <span class="cn">Inf</span>,</span>
+<span id="cb21-14"><a href="#cb21-14" tabindex="-1"></a>           <span class="at">fill =</span> <span class="st">&quot;grey60&quot;</span>, <span class="at">alpha =</span> .<span class="dv">15</span>) <span class="sc">+</span></span>
+<span id="cb21-15"><a href="#cb21-15" tabindex="-1"></a>  <span class="fu">geom_vline</span>(<span class="at">xintercept =</span> solved<span class="sc">$</span>value, <span class="at">linetype =</span> <span class="dv">2</span>, <span class="at">colour =</span> <span class="st">&quot;grey60&quot;</span>) <span class="sc">+</span></span>
+<span id="cb21-16"><a href="#cb21-16" tabindex="-1"></a>  <span class="fu">geom_ribbon</span>(<span class="fu">aes</span>(<span class="at">ymin =</span> power_lo, <span class="at">ymax =</span> power_hi),</span>
+<span id="cb21-17"><a href="#cb21-17" tabindex="-1"></a>              <span class="at">alpha =</span> .<span class="dv">15</span>, <span class="at">fill =</span> <span class="st">&quot;#2C6FB0&quot;</span>) <span class="sc">+</span></span>
+<span id="cb21-18"><a href="#cb21-18" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="at">colour =</span> <span class="st">&quot;#2C6FB0&quot;</span>, <span class="at">linewidth =</span> <span class="fl">0.8</span>) <span class="sc">+</span></span>
+<span id="cb21-19"><a href="#cb21-19" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">colour =</span> <span class="st">&quot;#2C6FB0&quot;</span>, <span class="at">size =</span> <span class="fl">2.6</span>) <span class="sc">+</span></span>
+<span id="cb21-20"><a href="#cb21-20" tabindex="-1"></a>  <span class="fu">scale_y_continuous</span>(<span class="at">limits =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">1</span>)) <span class="sc">+</span></span>
+<span id="cb21-21"><a href="#cb21-21" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="fu">expression</span>(<span class="fu">italic</span>(N) <span class="sc">~</span> <span class="st">&quot;subjects&quot;</span>), <span class="at">y =</span> <span class="st">&quot;Power&quot;</span>) <span class="sc">+</span></span>
+<span id="cb21-22"><a href="#cb21-22" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">12</span>) <span class="sc">+</span></span>
+<span id="cb21-23"><a href="#cb21-23" tabindex="-1"></a>  <span class="co"># theme_minimal still paints a white plot.background over the transparent</span></span>
+<span id="cb21-24"><a href="#cb21-24" tabindex="-1"></a>  <span class="co"># canvas, so both surfaces have to be cleared for the page colour to reach the</span></span>
+<span id="cb21-25"><a href="#cb21-25" tabindex="-1"></a>  <span class="co"># figure. The ink is left at its default, because the website inverts the</span></span>
+<span id="cb21-26"><a href="#cb21-26" tabindex="-1"></a>  <span class="co"># figure in dark mode, which turns the dark axis text light, whereas a fixed</span></span>
+<span id="cb21-27"><a href="#cb21-27" tabindex="-1"></a>  <span class="co"># mid-grey would be inverted into a muddy tan.</span></span>
+<span id="cb21-28"><a href="#cb21-28" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">plot.background  =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">colour =</span> <span class="cn">NA</span>),</span>
+<span id="cb21-29"><a href="#cb21-29" tabindex="-1"></a>        <span class="at">panel.background =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">colour =</span> <span class="cn">NA</span>),</span>
+<span id="cb21-30"><a href="#cb21-30" tabindex="-1"></a>        <span class="at">panel.grid       =</span> <span class="fu">element_line</span>(<span class="at">colour =</span> <span class="st">&quot;grey80&quot;</span>))</span></code></pre></div>
+<p><img role="img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAkAAAAFZCAYAAABwq5D4AAAACXBIWXMAAA7DAAAOwwHHb6hkAAAgAElEQVR4nOzdeXwdVfk/8M9zZube7EmbrulC9zVlaRIKpSqbIktZLSBfRBYFoQUV/amACFVBQUSQVgRFZPuigAgUBGT/QqttkhZKurfpQvemSbPfZeY8vz9uUpKbm7W5d+Ymz/v1qpIzc2eeubnLJzPnzAGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCOEWcrsA0VZxcfFFRPQCM88pKipa6nY9PVFaWrq0oKDgJLfr6Inly5ePNQyjHMBNhYWFD7ldT0+UlJQ87TjO7bNmzdrqdi09UVJSUkVELxYUFFzT1ccsWrRoUjxr6o7JkydfHQ6Hd5WXl7/pdi09kZ+f/4RSKnv16tXnA8CCBQs2ul1Td5SWlp7KzKcUFhbe7nYtPVFSUnIfgB8UFBQoImK36+muVatW5TiO80xhYeHZbtfSEeV2AUIIIYQQiSYBSAghhBD9jgQgIYQQQvQ7EoCEEEII0e9IABJCiASxLOsKwzC+5HYdQggJQEIIkTDMfKNS6gy36xBCSAASQgghRD/kagDKuOA3Q355Tu4IN2sQQgghRP9jurnrofbOn5NS6wh4sL07PeWe/eLUafT332dRXUEGaj65QJfdeOlrVWWdLRNCCCGEaI8LZ4AUJp3zwwtOmXvZ3yZiy7eMjladd7tvtPr7306gT5ZNCk2a8DFOfPsFNeZv88+Ev8NlQgghhBAdcOUSmIHGYDrXfliL7A7P1qQGv1A0DFsGvc3r7/ndm7+r3FA7+bfbMDLrK1bK7I6WJeo4hBCiO4hoBYAtbtchhHB1LjATU8697sUr8dwHt7xyIOYlsOy5919zIf5yed7MstPuWggNBGja3PlvXcEv/fNeui1wXjvLbnn14OL2LqkVFxd/QEQj43lkR4qZ04loKIDdAAJu19NDeYjUn4xMAKOZ+SARVbtdTA8NAVAJwHa7kB4aA6AewIGuPqCxsdGKWzXdl4nIc9/odiE9QUSDmdkAsBcAUlNTwy6X1F2pRJTCzFVuF9JDuQCyAZS7XUhPEJFi5iFoev24JTs7e9rEiROD7S13sQ9QZwgpCGT6YdfduxA60pbBDq6tDSE104+AFXuZL7OTDX8KYF88K+8FIwEMBbABQIXLtfRUNoBSt4voiaYAOpqIdgDY7HY9PTQLQBkiISIZjULktd/l15DjOJ299xPGMIwxWutGZvb6Z01MSqkipZRl2/aapqZaVwvqJiIa0vQFnJR9Qpn5GCJK5s9QC5HPIFfrr66u1h0t93AAYoQ5tS5IRkbjHVDmQmigjgzMz/RRsD7MqY2xl9kdfuAXFRUtSNQR9FRxcfFFAF5g5tuTfDb4i92uoydazAb/uMwG746m2eDfk9ng3ZGfn/8EgOyysrLvAsk5GzyAvjAb/CVJPhu8p78DPByAgAaeuOEApY5/4gP4AARw5tu+FFSMn6Bq1tXZE4PtLUu6V4sQQgghEspjN0IM0cxz5331V+cOngAAAf36il04qmZHxphr+WQ2jzJXXnMU7Qzd5Asu7WiZ20chhBBCCG/zVgC69s8mGIsJOJsA4PXFwa0873/epVmXz82cW3kC3r7qYuy4dPfzaOxwmRBCeJBpmlmmaaa6XYcQwtVLYDbWv7L4wp+0bHr0hvBKYPzKFk2HXr30kw+B45t//nsXlwkhhAe9Q0RvAbjV7UKEcNOU+S9OAoD1iy90rX+Zp/sACSGEECK5/PK13RMuLRqQ3hxyvEoCkBBCCCG6xOuhpjskAAkhhBD9XF8KNl0lAUgIIYTow/pjuOkKCUBCCCFEkkrWcGNqnQLLHJ//3ZdTdE5w/dqFF4cSXkOidyiEEP2V4zjnE5HcqkN0yTHfe2XSlPkv9ql7+5qks2CYtwLqgkgLQx3y1U+/6Z+P1Nfk3Lbtr6ckbP5LCUBCCJEgzLyLuU99n4ke6ujMzfq9wQE5aUYiy0kIpWwT5P8zwMdELUonopszsqvHArgwUfVIABJCCCF6UbJeloo3pXznxwg/LV0w43svnf7pA+e/nYh6JAAJIYQQXSTh5kjwyQB1sgqdDUACkBBCCJEoEm56j2YQKWOioXg8gycS1HRmnk2d5B8NHpKYCiUACSGE6Ack3MSPZgwxlDmZDD2ZmKdsqrCn3PXGgQmG4i8CAIEAMDoLPwBAhN1xLvcwCUBCCJEgpmn+iog+DYfD/+t2LX1FrGDzzvq6kcOzzYESenqX8mmLbWuMIj0dTBNI0QSQngGmQYCOrEQE3bqjfz0D20C8mZlYAed3uBONf8btAKJIABJCiMQ5HYAMA+smCTKJpxlDTB9NgDYmkHLyCTQdWo2FYgOgpq48DPDnp3UIdICBMsvEjlMnZcz6V1ndDx0Ob1GsNABocpTPsAYBPCf2Xumxst+ftywBhwdAApAQQgiPkKCTeEoZ6Yp4DIMnEtF0MCYAmArCADAA0q1CDgAwqJagN2nQJrDaTOysAcy1tg43AsDkwf6sE8akjnltdfUmBfX5vlhpu5FvMPy4EQqXEJDVtGgPMz8wbU/ot2UJOm5AApAQQogEk6DjDs0YYprIjwQdmkAKE8A8DoCi5tFZLbMOswOi3QBtZug1zLwGoE1OmHaSYo6czGy69IVw14qwdNDRuA8a90FhuKmM9WUPnrcPANb01oF2kQQgIYQQcSFBxx0m6SwmY6IiTGCiCQDnA5gKUOrhlSL9kg9joIbAmwEqI+bNmrGZbGeNrVTUnZkZpJzeKVRjT9lDkfDjBglAQgghjogEHXeYls9wHGdcy6HmAE8A1EgC6PN80/K0Dtkg3sbgNQTapLXeom3falCoIrK8RSpSCn2ZBCAhhEicJ5h5k9tF9JQEHfeYZGQx6YlMxnSQnqDAE8H2dEPBD3w+1LwlAh1g5k0gbGaOBB4Hzia20TTxaNP6lPB5SD1BApAQQiSIbduL3K6hK3ZV6xTDYN9/DuSMAYAp8190uaL+Q/m0tb0qPKD8YAgO8APTNJqGmvMgAoEO97lp1TH586Hm2iiDcjabjl4f0lTZeusyALElCUBCCNFPNQecaGeNSnAh/VR7Q82fLTlkAAAB3wYQc6g5a94M4s2a1ZqWQ80BG3CAUGdTTggJQEII0Ze1F3JE4vRkqHmKqRC0nZVOO0PNP+eg5VBz0XUSgIQQog+QoOMNvTHU/JoTBp46aWjKvNte2XeZth3u9lBz0SUSgIQQIolI0PGGeA41H5plFXVl3ixxZCQACSFEgpimebxt25UANne2rgQdb5Ch5n2XBCAhhEicxZZlvRUOh29tbpCg4x0y1Lx/6XcBqKSkJNvn83k6cgeDwXQAUEplrl69eoDb9fREKBQyk7X2QCCQ3fSfacl6DKFQyEdE2UlcPzGzvzv1r1mzJqvztRJDKZVimmZqbm7u4ZqW7TJH5/mqlQNjwL7QwPzm9oGZ7tTYESIyABgDM/0ZAHBsWobrz+2hWievKugU2FrnGYr3Dkg1SwakW7tirZtiUboi8h87OnbdjuNYFY00qj4Ynhp2eKzWPE4zT2Pm3PaGmhOjgQy13SBsNQ2s8/tU+UAfbUpLsapildD0r0cI7AeAGaPSsxxHJ93Y9SEZKlMRme09/y09F8fPqBkzZhwionafv353lbG4uHgREQ1xu46OMPNIIjoRwHsAKtyup4dOBfCu20X0BDOnE9FZAFahC5cqPGoWM5cRUb3bhfTQ+QB2Aijp6gPq6uo8ESV2VNnpPsscobUO2I4+2HLZnp3bT/SnpB4cOGjIRrfq64oUy5hBiszGoL0KAFJS09x7HTGwZE31pFWfBcdFLzp2ZOrWc/MzN0R/k5mKBiqF3JDNm6oatH93TThjf62dsafGzq6oC2cdauR0MLf7/ZdqqeCgdKMmN9OsHZxu1I8c6KsekWXUqw6+THuTpTDFMtWYhpB+IxH7iwMzxaJjAmEu7WzFcYN8tXGs438KCwvb7Tne7wJQMiguLr6IiF5g5jlFRUVL3a6nJ0pLS5cWFBSc5HYdPbF8+fKxhmGUA7ipsLDwIbfr6YmSkpKnHce5fdasWVvdrqUnSkpKqojoxYKCgmu6+phFixYl9C7FHV26mjNl0Nfqg+F9q7ZWf9iyPT838I+wVks3VPnuj3uBR+CsmXn3GAZlLinedQMAlFakbXOrFmXQlYrolvaWM/O9jsOPtRxqPjjDOh3A1Io6Ox2Eds8wtDerudNmqHli/fTMoT/OSTOuvvXlfVNCtpN0Z4CmD/dnXVo04L7bX9l7bWfrrl98oWt/DPS7S2BCCNEd0kfHPSbDYKLrOlqHCN83TboI4LFoGmpeUW83LWxaKR6zmoukJwFICCEgQceLNIyjFHhgx2uRBWD84Z9AB9L9tG9kjhVevyf0rCZnIwy9WYdUVLLpxVnNRVKSACSE6FfcDDplB1MucmvfycBkGFrxRKXUTFY4lpiP78rjNPBXYv2+wbwhpKnywuNzTxiebc4q27XvZQCA4+lxL8IlEoCEEH2WnNXxNsPkbGg6lpQ6lhgzmXC0AtKAVjfY6ZRyaLHNqHGkW6voBglAQog+QcKO9ymDRhFQQETTGSggYGrzRFYtx2QxqJaYP2XilQpUxMCs9rbJjDccdmriX73oayQACSGSzpT5L8YY8dWQ+EJEuxRTGhmYSgbNBFMBwMcByGle3iLvOCBsZfAapVFqs1qpbWwmFbn/jaH0QDaMp5omEG2NuNwh/jmkK4/oAQlAQgjPix14hJdoxhCfpWYCKDh8dgdQkRsht7qeVQ/wBtZUyqRXKm2U2E1ncCI5xgG16LIT0lRpwPgaSF9BxCcCGAlgJzP+y2E8CZLkK3pGApAQwlOmzH9x0p5qW9UHnWwJPt5kKCsVsKcxGdMJugCE403g8GitqJ44nzHxStZGmYIuDWl7nWKlm0OR7sLpm6b78jzS9O9z0uVHHAEJQEIIV/WnkDN1YPDekIPVW6r9T7tdS3doxhDTRD6xmkmKC8DODBBZn08ZcVgDwOubz+6A1Cpt66apImxooLnLj+jH3Lz5YUsSgIQQCdOfwk4sBvF4U6m9btfREXa0+dkhO213rc5eV5v2I1vTDJ/VNH0QNf1P05kXAh3QzKUMVUrsrGGEP9HatD+/5NUmIIl+yCuBJ5oEICFEXPT3sJMsarU5sCqgJgVsc3qYMd0BTVy9ssEXWapOO7wioRHM6wAqA1Bqky5GGE1znTUHHflK6e/WL75w47OrVuU4jlPv1eDTTF6tQoheIYEnCTCMirA1sjZkTA+wyrc1TdRMo2Otmm6RE7R1SYqpy2qD6h1N/Ck7CEV1aBb9nNdDTkckAAkhuk3CTnKos40BlSFjcsBRE8OOMd2GmgawP8aqjkFcbim9xq9406WFOWcPzjD8S4p3/QwAShvdmwxVeEcyh51YJAAJITolgcf7CKwOhHyj6sLGxIA2poc18jXTKLQaK8XN61YahE0ppi5LNcJrcy1s9Bt2qHmtganqywBiBSXRj/S1wBNNApAQohUJO/FTE1R/DLPa1xvbCjhW2kFbTa4PUX5YGxMdpukMZMRY1VHEuyyFshTlrMmwnE2DfOHtvVGD6Fv6euCJJgFIiH5Mwk5i7ajzvdXTxx4KqeGHwr7ph8/uaBoFinUnHKo3oTdahrMm3cdlQ3zhtRbp4JHULfqe/hZ2Yul3AeiRRx7Jdpy2UwMPGjSo/uKLLw5Ftz/++OMpjY2NqdHtfr/fvuaaa2qj25mZHn744Zzo9qZ91Fx88cVt7vr15JNPptfV1fmafw4EAumWZSEUCqXE2s4dd9xhDh06NDPWshtuuKEqVvtjjz2WGQwG2/y+bdtuuOmmm9p8OD733HO+ioqK9BjrOzfddFPMeXcef/zxnMbGRgKAUChk/uEPfxgAAPv27atduHChHb3+/fffn5qSktLmGDMyMkJXXHFFfXT7HXfcoYYOHZoda9/XX3/9IaK20ycuXrw4g4is6PbU1NTGq666KhDd/sgjj1gVFRXZubm5CIfDac3HYBiGvu6666pj7duLrynbts2DBw9mN9ff7H83DxxdEfQ1Rq+fZsEYlq7b/L4BoPyQivn7zksLZaT4zDbHvb/WDtQ5vjbHnWGEfEMyzTa/70DI1rsbfHWx9jEuR2fFat9br+obwm3voKc47PdbRpvftwbZQZva/L4JrFJMTou1j6A26rXmNq8pn3JSDUVGdHvI5pADo81xK2jTb6LNcRMpbgijzescAEip3P2Naly9bU4JaGNKSNNkZrR+zxPAgDaId1qKt6QbzoYcv7N+kBXeqVSkbkezE9JGm/e3UkR+5cT8fQdsinln5eEZSE01dZvntqbRDnvtNaXtYGp7X2/dfU0N8odSs1LNNsfdaKvwnjp067h31lm1Idtp85oalmanpfnU4YK1Y/ttm5Fthf0HbNXmdZudoszcFLvN69Z2NO+oNdt8hgDA948+sK/V59Tnn2111113XTh6/fY+p5g5PH/+/Dbv15afU9u2bcseNmyY1eI7oHrhwoVt7okQ/d3XLBAIBG6++eY2z217332pqal81VVXHYpx2B3qdwEIwCrDMMZGNx46dOgSAM9Ft4dCoRsNw7g3ut227Q8AnBzd/uijj6YahlEZa8eHDh3KB7Amur2hoWGRYRhXNv+8du1aAIDf758P4J3o9UeMGHEcM6+ItQ+0c29U27bfMQyjKLrdNM35AP4Qo9bLDMN4PLrdMIw1APJj7SMUCu0yDCMNAFavXo3m52HEiBEnA/ggev20tLSfE9EPo9sbGhqeA3BJdPvIkSOP0lqXx9r3o48+OhhARXS7aZrPATgzRq13AlgY3U5EZ+zcuXPJzp07AeDXhmH8umnRPgDDYu0bwGrDMNqMpDl06NDXAPwjuj0YDH63xXYPC4fD7wI4Lbr9L3/5S0Z7r6mqqqqpANZHt2/duvX47QfqVwGtP1tOG9X41N83+34Zvf7xg+tnjMkM/j3GLpzyQwOnxdr36aManlTQ06PbK3OMO1/Z5ns2uv2UkY3n5qY4d0W32xobnt408NxY+/ji0OqlALf5gNxR77/s3Z3ppdHt43L0N1MM+6Lo9jCr9zZU+ds85zl+Z/iI9PBfYu17S43/okat2nzQj8sO324SF0S314fw5Na61Gei24dnOEUDfPad0e0MOrimMuUyAKgKqtw62ze9QdP0sFbTNdPEWGOtFHFQMdZahrMmxdCbBvl1WZph143JDHw9w+LvRK/vsFq5rsq4Jbrdr5z08VnBNq9NANhVb10dq/2LQyt/kWpibnR7g62eeG6L7+7o9uMH1x0zJjPU5nUAIFx+aGDMz5DTRtY/bRBPjW6vGmDe/vJWX5vP51NHNV4w0O/8PLqdamu3I3fSa7GP49B/AbQJsDvqUy59d2faquj2U0bU35xu8RXR7QGHXvnb5gH/L7p9+oDG0dMHNL4Ra9//DmUU7Lbbhv3TRtQuthTPbv559/ZD2A3gS3nmlS9syfpj9Pqzh1SfOjQ1/FB0O4P2PLFhwMkxz+488shuwzCGRzcT0XkAXoluD4VC/88wjDbPLYA3EOMzdfHixQMty6oAgP3792P//v2HvwPy8vImANgS/ZjGxsY/G4ZxaXR7enr6bwG0+W4YPnz4bCJq810SCoUaAcT8Q6Yj/S4AMfO9AGKdRVgda32t9QdE9JPodiL6rJ1dhJm5zfpN2rv2/zwzH/4Sy8rKys/Kyrq8sbHxw1grM/PODvYREzMvAtDmxa+1/k8765e2s482IaPFY24HYAHAsGHDrt+7d+/DAGDbdszQQkT/YuZY22vzhd5Ua2V7x93Q0BDzL2kAjzNzmzcMM38Ua2VmXmdZ1r1Dhgz5UX19/StVVVXLmmptb/sA8GtmbvNXpeM4ZbFWJqL3Yx2HUipmv4zMzMxgZWVlzOO2bftA83+3vJxVr/wHAhx6JxhyWv1VVGcbbQI4ABwM+XcPCIbvi1Fru2OeqwL0tEkqN7q9Muj7ONb6lSH/pyYF2uzDgYoZ7gCgNmw8oLVuc0Zgb53aFWv9BttY4TDa/CUY0irm+zXgqOp6Wz0Wa1nI5jZnHACgPqzeMBW3OcYGrWL+vhvCtMOnPt+HrZW5L2DkVgSsnJ2N/ttsrY5hjvmZBL/i2iyfvS/LciqGpIT2+S0sqWpoeyz1IfqEiNocR9iJ/ZkTCOtge8cdcFTMM51VQeNfIYc3RLfXhI2Yx10RsHYN8Nltft9KqXbvjlgVoKcsRQOj2w8EjJifzxUB8xMD3GYfOVlpMc+YAkBNyLifmdv8obi/wdgda/3KoPmurZ390e0NjrE51voHGo3K6jTVpiYAqAki5muqKqie9yte1vxz3uCskzNS/YU7yquXx6wp5N+YopzD+zgqM1QBAEqp2g4ubd3FzG36iBmGsTbWykT0jta67RlNpbbGWj8UCjWYpvmTpm2mDho06NJ9+/Y9DgB+v/9gO/t4Vmvd5r1kGEZxrPUdx9lqGEas7+M2Vxi6QmZS8aDi4uKLiOgFZp5TVFS01O16eqK0tHRpQUHBSW7X0RPLly8faxhGOYCbCgsL2/yV5QWd9d258+wh9320pf6Bt9fX70xUTb3pNxfmFdcHnbfufG3frV19TMGghjFxLKlb5kwZ9LX6YHjfqq3VH7Y8u2Nrmuiwmswx/vgkQqMBXW4R1qSY9pqBprM2w+fEvFQUb2fNzLvHMChzSfGuGwCgtCK5hsFfPTv3hOHZ5qy7Xt/3oNu19MRPzxz645w04+pbX943JfqSWTL03VkVuRHiM4WFhWe7XUtH+t0ZICGSmXRa9jZ2tHkg7B/74TY7f2+dPqGiPv1azU3TSEQhcKVpcJmf9NpM0ykbnGZvphh9jkT/lgyBJ1lJABIiSUj48Z6qoMqtdcyJLaeRYCbfnr3NZ+SbT7JzwCTeMj4zOCnT0murg7grzeTWl5pk2qx+rznsTLmqpAoAPnng3I2UlOewkoMEICGSgIQfD4iaRiKs1TTmtv3qAMBvUEOGj7cHw/YHqaa9aXCKs94C2/m5gX+Etdq7ocoXs5+N6F/k7I67JAAJ4WESfHou5BgpuwPWnKCmcSDl85GzdZA/+FFm9JmXdtTZvgGVIXQ+jQSRbUBvbZ5GIsfnrD5nRvYXI32A6mIOZBD9j4Qd75EAJIRHSfjpuX0B3/j9QevOlv1vAjBRZ5vfHGCF7x2ZFixpuX7zNBJRk4T2aBoJIQAJPMlAApAQHiThp+eCNqXuD/p+rhmDopdpRnZlyPpJqsE/DIAGyDQSojdI2ElO7gWgectSTwvePvEevXZz4at7Yt55dNC59+QV8UcTo4scr9fvf+C1TevGnXXLpOlG2eFr8EpX6jK9dMWW1yG3fRdJSYLPkdsVTDk5VvhpxkDmzkbfI7GWEVBlEG+0lLMpMo1E41qLVK99njhMW2zNbe4pI5KLBJ6+wYUARBh+7v0XTg/86tEMztx9J80Ycf9cdf0Plux6Lnr8JzNOU0CrO1HaUAMNhRcVrKt8RvV9BuxZDsxIgDIQCvtxMoA9iTkWIXqPhJ/eEdKqS89j8zQSpuJNKaTLMn3OmlzL3kHUcih6m3swHpF1lf4f9eoGRdxJ2Om7Eh+A5j2cPTqw5KFLeflV33q1YsmQc/72FYd+98RVZ+x6+y9votUdYQ8u+fFTrwFPHW64YHLuifboN2/gHXf/9uQfmylYM/pG9f4Fp73cuKzNfoRIIhJ+joxJRtaORv+chrCaGdJ0cmfrG4RtE9Prv+c3uc18Q6J/k8DTfyQ8APmDWSeOwO76/+RVvAEA++u+9u6ezH9UzvN9+oW/oOHl9h8Zpon2d+86Fy/9ZcKrwU04h9J8qBgxiY/df8rZmQVf1uU7bnt984HO7iJWUlIyWmvt6b5PzDyUiEBEeStWrBjndj09wcwpyVo7gFEAwMy5iTiGp1ccajM33ZEylEobOcCX95WplJR3e2ewUorSvzI1Y1Ss5SEmc8eB0LRDAV3QGOaZIa0nVwUtFXksQE3/254Mn946bog/B0C7UyYcCctUmX5tBEcMTIk5TN7riOBTRGZz/bmDM9pMEuplmSlqsAJnt/f6aXb58Tltp3X4pic+t7IBoLS0dNyKFSuS7uaY4XA4SymV5vZ3QFFR0daOpvNJ+Idj7rn3Xn+B/uuFi15d+5UUgIEQTZu74F+X4+U3b1uy74H2Ks08783Zp+hbHgraK2e/+TqC/rNqJs0yLv1kINRuDfNQGOEJY3nr4w+lrv2B8XzbGX2blZSUlAPo9S8cIbprb02Ppq/ptyobbGzeH8KmAyFs2h9CwG5950AiYHiWiVE5Bj7eFULQbv974zsnZWF4Zpv5MEU7/P62o/+T0bAsT//tK3pZbW1t6imnnBJob3mCXw0EE9pnEgc+/+hJYwfXBh0Y7b/D7giro0qvXHgObbv72uYOzvR/djrX/uY3zqqHJr5edyB77raxNbhp6WOBXR8C1TFnOQYik6ESUcyJB72CmfOJ6HIADwNI1hEn1yNSf9Jh5oFE9CNmfoWI4nJ5tWx3oN1Our0hO9U4qy7gLIs1MWgyGJRhLjjY4Gz7b3n9pu1V9lH7a8JjAzZnRq+XalH14Exr+1EDzO2TBuJQui8y2WS6aY36cFvoS2EHbT5XCkdaS32w1x+sjV8ATfMZMxzNdUFbx5w40uuy03xnKgV/VV3oJQDwhY0qt2vqDr+lRluKR4/J9b/kdi09dDaALwC4Bc33X0gizJwK4FIietzlUjp8kyc4ADEaOaOyEcYA3AHCQjDu+LGyVu7OSUVjVXu/5bSS0uNGqfVjPqqtfK25LfjaOeWvAz+b2PRz9ZLxW/fPXfDeVv74eEL1P9rbVlFR0R979ZDioLi4+CIAlzPzM0k8Geq5BQUF97hdR080TYb6IyJ6Ox6ToSaiv8+dZw+ZvHxb/bPJNBmqYSOVU+k4cmj2iAGWtbs6PAXAlJbrMFAJxk3JpO0AACAASURBVAoFXhbW+LDW1rtrGx2U7wdqoiZDzUuxnjoQsM4KMY2HhmWavHWAz/l3uK5u6wdr4nssc6YM0s2TocZ3T/Fx1sy8AgOU+cGa/c8ByTEZasu+O6Wlpacy8ymFhYVJ+RlUUlIyGMAXCgoK7unoEo5XNU2GWuT15z/h5wMD9KVPdvFTk5/6BFkADmHFORlp5p3TTkTdqtiPUBimnr/6WBx44Z730XQqi5A3987z5uJvUx5bsu6eSMSrJwvzh2ao4IrEHIkQ3SednT+nSSufMqdCYTY0ZsNEITF8UMDu6jAAgEEBYl4JhWXQWBbW9jrFSnelQ0qOFd6fY4X/GteD6KamqTCWbqjy3e92LclOOiuLI5XwABQ6bkrZ7pXTi/+jw4suPXvSIxvV49+eyrs+2ZEaXol5FxozG82fzsO7H9zyasX7AIBrF1k5u/99xnFq3/WfX/FnHKRL1q/j//xp/txsYyuNLd6nbz5jGMrGPWjsezbp4rLo8yT4RCiDRhnAbA2abUKdCEJ2m/7KhM1fGJ8+alC6ueL5/1bPh6WDzb36VC8PSxfJQwKP6G2J7xG20NJrz97+PxnGbbcMNqpum8ZbP/1luOx7o16Fg5MPmJw5fDJAZc2rp3525dBM86mNr6lgccvNBF+ZsqH8vIdOU/rDqzO4+saxtH3tLeaaE475J+QmY8JT+nP4UUxp8OFYcmg2FGYTML1t3qEDmrlUgZcFbX5PEfafNS2zuD7o7H/e0nJT035KAo+IN3e6xL92VNUK4PANwZ5u/o/3P7RXAZe1vBbW+Hrazg+Asz6IsZmdL9/46U7g+80//y0+1QrRY/0t/JiWz4C2pxy+rEV0PJjN1iduuBFMqw5f1nKcNQDgAFBJOWhf9AYJPCLRZEygEHHSX8JPy8tazM5JRMj8/LIWA4DDwHpoLGODl4GcYh1S4fZvViH6Awk8wm0SgIToZX0++FjINVkVaWC2Ar4IYPjnl7UO98D7TAPLFLAMjr3MYVUDANBAb08vIZKDBB7hNRKAhOhFfTH8tByeDoXZxJgGgFrGmOjh6WDeDTTlHQk8h+1rMH8UsLnO7ToSQQKP8DoJQEL0kr4Sfjoant7sSIan92cHGs0tbtcQLxJ4RLKRACREL0j28NPV4ens4D02eJluQKkMT+/fJPCIZCcBSIgjkKzBp6fD0wFErmtZcret/kYCj+hrJAAJ0UPJFH5keLrorrwsI3Ti4EPbAOCZhZdL+BF9jgQgIXog0eHHNNR0VvxNaJpKhFQCb9JMLzqOfqu9x+ytdYZbBp0kw9NFVzSHHQAYkT0yALSdSFaIvkQCkBDd4MZZH2XgHBB+S0yHr1ExaBQRTjUt9ZQd1r8E0Gp4+v3vVp7eENZzQSTD0z1k0oDQdwJhbNlR52s3uCZKy8AjRH8kAUiILnIj/DDxYAXjZ+2vgG8YphoCYGTL4ekNYd20WIane4lP6S+TpdIAJDwASeARojUJQEJ0gVv9fQxlnAni7Nbdk1sj4Izm/2ZQgICSE49KHbivNvjAhr36/0g5LFe1+h8JPEJ0TAKQEJ1ws7OzUhgN7rgHMoMDIDwJzcucgFoJSwdPm5J230dbeMvG/fUyXKufkMAjRPdIABKiHR9/1jjE9ZFeGsEOTv4AAIjVBtt2fgsAsHQCihJeIIFHiCMjAUiIGPbW2G6XAABwmFYa1OlJnNJE1CLcJYFHiN4lAUiIKE+tODT2q9Oz3S4DZMBnEM7qaB0GKrVjP9FRHyHhHWGHloVZberKuhJ4hIgvCUBCtOD6Ja8mJhlZrHgxmI8HABBVgHlQy3UI2A3HuZlBe10pUnTbhkP+37a3TAKPEIklAUgIeCf4AIAicyRM50/ENA4AM3ixE9YPmaSO0wamAUglxkYH+r/MFHK7XtEzEniEcJcEINHveSn8GKY5g6D/CKZBYIQB3Oo4/AoA2KxXwcYql0sUPSSBRwhvkQAk+jUvhR9lGXOI9e8BpAOod7T6LrP9odt1iZ6ZNsTYn1InoUcIr5IAJPotL4Uf01LzoPVCEBlE2O9ofS2zXud2XaLrWp7hmTBoaGU4LLckEMLLJACJfsdLwYe1QaZPLwBjAYjAjI221tdCY4/btYmO9eSSFhGNIKJGrXVlHEoSQnSDBCDRr3gp/JABn2Hx3cQ0t6lpqXbUTYCuc7UwEVNv9OExDOMlInpLa31rL5QkhDgCEoBEv+Gl8NM8zJ0YxwMAA/9gHfoZw/TGHRiFdFoWoo+TACT6PC8FH6CdYe42PyRvR3dJ4BGif5FPXNGneS38dDTMXSSWBB4h+rd+d//84uLis4go3e06OjELwA8A3A5gg8u19NQvEKnfNf/d1ji8J4/zKc7Ny/H9rC7g/KOiQf9fb9Wz6rPAlOLt9Vdrhl8RgoWj0x6fOTo1LiO9hmcZ3zhYZ/8rpOlgPLYfb6MHmL8O2bx6b63zv119TLihdkhHy6cNNfYfeWVd4/P5TmXmg+Fw+JOW7du3b/+VZVmf5uXldfm43JCamrqAiNIaGhruBYDc3Nxk65SfT0TTmfnvbhfSE0T0DWaeS0SXMHOnkwF6DRGlM/NNAH7lZh3l5eUvXnzxxU57y/vjGaDRANyf6KkDzDyUiAAgD0DY5XJ6hIhSmHmcW/sv2x0YlOHrWb43iHIAQBEGZPhoVG/U88GWhhnF2xu+DIbym1R31vTMF8cP8tUB6JXtR1NEaamWyvMx0uKx/XhTRGQopHfn+Q9pc0B02/hco6rFj3F5rmMxDCNba02mabbaJxEpwzDSo9u9hoj8RGS1qDPV1YK6bzgzDwDg2mfQkWDmnKb/Hwcg6QKQ1jqViNLg8vM/ePDgDr8E+t0ZoGRQXFx8ERG9wMxzioqKlrpdT0+UlpYuLSgoOCnR++2NS16nT0kf+dXp2e/srQ7/8r63Dzx1JNtqHuZOoAUAwIyNDsd/mPudZw+576Mt9Q+8vb5+Zzz3Ey+/uTCvuD7ovHXna/u6PFqqYFDDGK9c1po8efLV4XB4V3l5+Zst203TzAIQtm270aXSuiQ/P/8JpVT26tWrzweABQsWbHS7pu4oLS09lZlPKSwsdPUsdE+VlJTcB+AHBQUFioiSLgCtWrUqx3GcZwoLC892u5aO9MczQKKP8lp/HxnmnhjrF1+4EQAWLFrkdimdsm27xu0ahBAREoBEn+C18CPD3OOnOfAIIcSRkAAkkp7Xwo8Mc+99EnqEEL1NPpFF0vJa8AFkmHtvGZ5taiKrWoKPECJeJACJpOTF8COzufdcm6BzVYlLlQgh+gsJQCLpeDH8yGzu3dcfz+5YlrUYwMpwOPyY27UI0d9JABJJxWvhR2Zz77r+GHiiMfPxRFTtdh1CCAlAIkl4LfgAMYa5M5ZpR90ow9w/J6FHCOFV3QlA6QDuB/AggLXxKUeItrwYfmIOc2cZ5i6BRwiRLLoTgIIATgKwChKARIJ4MfzIMPfWJPQIIZJRdz6xbQDfArAIwHYAbyNJ56kS3ufF4APIMHdAAo8Qom/oTgDyIRJ+hgJ4DYADILqvQwBAj2bgFqKZV8NPfx7mLqGndxDRQ1rr7W7XIYToXgByADzcyWP6df8HceS8Gn762zB3CTzxEQ6Hn3S7BiFERHcDkNy7QsSNF8NPfxrmLqFHCNGf9KTXZgaAbwIoRORSwDcAfAXA/wGQ+1uIbvNi8AGAkGbD9PNv+uowdwk8Qoj+rLsBaDSAdwCMArAZwNimbdwOYACAM5vahegSr4afxhDjf0tqLiPGUUDfGeYuoUcIISK6E4AIwK8B1AOYBqARwDpE+v2cAWAJgHsBXNjLNYo+yqvhZ18ND/vDRxU41OAchSQf5i6BRwghYuvOJ7oF4EsAbgJQjtajvaoQCT9/6r3SRF/m1fBjmOaMDfsDizQABTia8ZNkGubeHHgmXFVSMzbX2rrI7YJEK4ZhnAZgv+M4n7pdixD9XXf/pLXQ/r1/HADGkZUj+gOvhp/mYe4aSPebhFlj0p57d32t58OPnOVJHkT0ayJ6SwKQEO7rTgAKA/gIwA8BRN/7xA9gAYCSXqpL9FFeDT8th7krwsHr5gzMVcCWd9fXul1aGxJ4hBDiyKlurMsAfgxgDIANAP4IIAWR+cFWA5gF4LZerk/0IV4MP6wNMky6EYxfgshgxsZpeanz87Itt0uLScKPEEL0ju4EIADYBGAmgMUABgLYAeAEAP8GUASgtFerE32GF8MPGfCZfv4NgRYAaB7m/vVBqTjgcmkxSfgRQoje092pMJ4E8AGApwEsjEtFos/xYvjpeDZ3f47b9UWT8COEEL2rOwGIEbn8dREinZ3LETnz828A70Fugihi8GL4UWSOhKEfJcZ4eHyYuwSfvoWIdmqtq9yuQwjR/U7QJwDIBHAigDkAvgDgCkTODq0A8DqAu3q5RpGkvBh+Ds/mDkRmc2e6zdH6ZbfrikXCT98TDocvcLsGIURET/7krcXnZ35yAJyMyL2BTgZQAAlAAsC2g8FUt2uIlkyzuUv4EUKI+OpuABqFyJmf5n/TETkzVAzgbkT6B3WBgWnnzJ8zGptnTsCO1Q+8WvaBGbnEFoUw/pybz5+KDcc0tygcctY4H/1+y+uo6fp2RCJ58cxPMs3mLuFHCCHirzujwPwANgJ4BkA+gOcAnILIWaAvAvgpgLc634yB8ef+8BdTqOyJNEqZsIYm/+nWueN+FTuJBchP1TdkUeNJRDQm8o+PCmiY3duOSBSvhZ9Yw9zDjr5YO5DwI4QQ/Vh38oJG5AzPbETu+eNDZCj8EADLAOzpykZSzxw6cjivWPA7VXzSUS/XrfWfUz1RY26xcf7uP9ovBba1WvnaG8yUPXtG38z/d1nhq+GVPd6OiDuvBR8gMszdsPjuZJjNXYKPEEIkVnc7QX8VkRFgRyMShGYD+A0io8O2IRKQrup4j7+YNQq/3/o9X90GAAimppdXBkZt/J398ewbEBVcqr6T5sf3hyxRlww549yqHwzB/q2N/uJXX3geoW5tp4Xi4uKziCi9G8fthlkAQESnlJSU5LldTGf+u61xeHSbQZSz4JTBX3WjHgCoqbfTlqytu6Y24EwAgMGZ5vLzZmS8YBrGnM4e61OcCwAZfjU1EcdwwpjUPbiq5JjO1+yW0Uqps0pKSvb38nYTxWLmsSUlJfO6+oCDBw+2eR26xTTNKYZhDJ44cSK5XUtPKKVyiSht4sSJXwWAkpJef33GFTPnE9HU7rx+vISIJjEzVq5cOa+kpCTpunVordMBDHf7+S8vL3/x4osvdtpb3pMrRg6AVQA+BvAOIhOkXtr0/8PRYQAiZFDF8EwO73vieWgfADyf6thzr9lXSWl5hJpWHXh8wZSj/JyTsZF23pqKAcU7efxleY36R6fNKz9jdbDr22lVAdEiAGN7cNxu+IXbBXRmb42NMQNj3zV5zEDrwQSXAwCoqnfw4sf1qA04IAJOm5yB0ydnzEJTsOyqjBTjoowU46I4lQkAGJYVv4u2RPSFuG08MU5p+tcl6ene+7vG5/O1+nnjxo3IzMzE8OGeyWodSk9Pd+U93BuYGYjctiXpNNUOZv67y6X0SHP9iHSVcc3gwYNTEcksMXX303cGIqO9vojIEPghACoAvAvg2+hKHyBmQquOyg0E3AhmtPlLKaQ/3Z2BfWc+4y9+Xz0PByePTjkuc3bJpY2ffb2Mur6d1rvnc5VS/k7rdNepzHyvUuoaZv7E7WLa82pZ7ej2lh2d5/vV6t2hWxJZDwCs3xucsHZv462ORg4B9qhs3+IBaeYHpZ8FuryNnBQ1dPxg38PVjc6fN1eE/xWvWs/Jz9wRr20jEp4fBrA7jvuIG2Z+j4jeA/Dzrj6mqqqq3ddjomVkZJznOM7+xsbG/7Rst237ydra2hUpKSmL3KqtK7KzsxcCyKyurr4ZAPLy8uL5Wu11WusiIiokoofdrqUntNbfI6LLlVJF3CJNJAutdSYR/ZKIvutmHSeffHKoo+XdCUB+RO71w4j0+fkdIoHnY0T6B3UBo5EG7K1jc7CaB4Xn4WDeC8pqrB+cRQ172/yWX72s4lXgncM9td/fGag9d1jpIU4bG6ABJV3eTgtFRUVlXT9kdxQXF48hIjiOs6GoqMiT04s09flZ097y/POGNTy7orLd5fGgLGOOYr4DTcPcbUd9t7wi8GF5RdfDDwCcPiW9evxgHxpDem+8jmH94gs33hGPDTcpKSmpdBynbNasWVvjuJu4KSkpcQBUFBQUdPn1v2jRIs/MXDt58uRZ4XB41/bt21u9fkzT1OFwuCq63Wvy8/PrlVJmc51z585Nqj5qpaWl2cw8ojuvHy8pKSnZBwDHHXdcKRElXQBatWpVjuM41V5//rszCiwM4GwAuQBOB3APgJXocviJsPWPl3+GnAnpgZTRAJDSeP2IbNox+TojuKz1moRB59z97Svn5r9y4TwYAIB5t/kysO/oPFX9abDL2xG9zYsdnk1LzVNaPwognQj7Nev/8eI9ftYvvnCjdHgWQgj3dXcU2LuInAn6GoCTEAlDhwAsBfASgGBnGwm8WvHZ7rk/+fO5wEvOuYNeOMjmRTN51RPGS8FynPy2eVzmo0u+Ru8/89NX9j9dEX7qH2W+oxdMDg567by5A0urAxtPHYN1u6fXVr0QeN8OtrsdETdeCz+sDTJ9egEYC0AEZmy0tb4WumujEhNJgo8QQnhHd2eDHwFgOYC/IzIi7CgAZwL436b2LoxYMnnLkl/9qIyn3hLQgfAkrP3pva9u+r4FML70ngbjdSLaxADw5rrKEr7/xM08+uEwBw6Op3ULR81cPffU9xHocDsiLrwWftqbzV3CjxBCiM505wwQIXLZKx3ATAAtO+fmA3gRwK8RmRusExavexX/Wgf8CwD+1Ny88C69Cvj9qparvjqiYTnw+VxNr3RhO6LXeS38dDybu7dI+BEtzA+Hw5VuFyGE6F4AsgCcBuBmtA4/AFAG4HZEOkaLPsZr4UdmcxfJyrbtFW7XIISI6O4ZID+A6naWVzUtF32I18JPsszmLsFHCCG8rbujwD4BMB9AStQyP4AFAFb3Ul3CA7wWfpRlzCHoJwAMQmQ29+tt7Uj4EUII0W3dHQX2UwBvIHLJ69+I3GRtEIBzAAxFpGO06AO8Fn6SZTZ3CT9CCJEcuttpYiki0wn8EJF7AQ1A5NLXhwDuQwc3xhPJw0vhR4a5CyGEiIeuBiATwAkARgHYB+A7ADq8xbRITl4KPzKbu+hrLMu6Qmu93XGcD9yuRYj+risB6CgArwKYDhyeZ2sdIneFTsrb7IvYvBR+kmWYuwQf0R3MfKNS6i0JQEK4ryudoO8FMAaRy15zEBkGPxLAA0DHE4+K5OGl8BMZ5s5/awo/zOBFjq1v1VrCjxBCiN7RlTNAXwSwCMD9TT8vBTAQkdFgPnRh+gvhbV4KPzLMXQghRCJ0JQBlIzLje0sfo+1QeJFk3Ao+mrQy4DtJKZ4G5kwCbQLjPW3iaGL9ezTN5u5o9V2vTmjqdg1CCCGOTFc7QUdfevDUpQjRfW6FH6XUUEOphwl6OoCmi6gMAhqIdQqglAxzF0IIEW/emztAxJ2rZ36UepgiHepbYSCNoMDANtvRV3ptmLsEH9EbiGgFgC1u1yGE6HoAOhuRjs/NZjQ9dgFanw2yASzundJEPLjZ38dS5pxY4acV5k8k/Ii+KhwOz3e7BiFERFcCEAG4qp1l90X9HIAEIM9yu7MzAUd3uo6i6XA4EeV0iYQfIYTom7oSgFLjXoWIO7fDDwCAtK/TOy9oWIkppnPHjkrd73YNQggh4qM7k6GKJOWJ8AOAmco7W4eIPNE/YliWdI8TQoi+TAJQH+eV8AMAYZhlBDgdreOw83yi6oll/eILN37j+By5w7kQQvRxEoD6MC+FH8XGOB/pxxgw2l+LHtMO3k1cVa1Jfx8Rb6ZpZpmmKd0KhPAAOc/fR3kp/JiGms7EfwYwEOBGgO9gqGkgTCNGJkNvYo2XtcZHbtUo4UckyDtE9BaAW90uRIj+TgJQH+Sl8GMoKmCiRwicyUANOfpam2kV4J3pLST8CCFE/yMBqA/xUvABADLVCQQ8DHAagAp2nGscpvVu19WShB8hhOifJAD1EV4LP6t3BbIN4FEAfgJ226ArmWm723W1JOFHCCH6LwlAfYDXwo9pGnNf/Lh2LAACY2uY9VVeuruzBB8hhBAyCizJeS78GHQZwPcymADeFNbONyT8CCGE8Bo5A5TEPBd+LPVtMH4IAEMzjYY91fblxHTI7bqaSfgRbnMc53wianS7DiFEZJ6vfqW4uPguAIPcrqMTY4noy8z8CoC9sVbYfCCUneCaOvTy6tpjyvYEpgDA0Exr/3e+MNCwHf2223U1mzDYV92N1TOJ6OvMvAxAWbxqiiciOpWZiwHUul1LTxDRlQC2MvMHXX1MXV2dZ94TSqnJAOq11jvdrqUnTNM8BYDPtu03ASAjI6M77x/XEVEegDxmLnG7lp4gohMAHE1Ej2qt3S6n24jIB+BUZn7D5ToWFBYWhttb3h/PAD2rlPK7XUQnTmXmLxuG8TIzfxK98NWy2tFuFBWL1kTvbqi+uqpRTwGANEsVzxqdcZ+p+Odr94b/7nZ9AHBOfuaObj4kj5m/DmCpUsoTx9ADo4joWQC73S6kJ5j560S0gYge7epj6urqPPO+yMjIOM9xnP2NjY3/cbuWnsjOzp4GILOuru7vAJCVldXd95CrtNZFRFSolOry68dLtNZpRHQ0Ef1JKeWd2aG7SGudSUQT3X7+Z86c2eHMA/0uABUVFXn+L/ri4uIxRATHcTYUFRWVtlzWdNlrjUultWIyDFjqLgBnAwATltQFAz958RPbLhgzrOHZFZWu1tl8yeuObj5u+fLllYZhgIg+KygoKO38Ed5TUlJS6ThO2axZs5JyWo+SkhIHQEV3nv9FixZ55mzX5MmTZ4XD4V3bt2/3xHu1u/Lz8+uVUmZz/XPnzk2qy8elpaXZzDwiid+/+wDguOOOKyWipAtAq1atynEcp9rrz3+/C0DJymv9fciAD6DfAvgKADDRs2E7/HPFpifO10p/HyGEEB2RAJQEvBZ+DGWlEjmLAZwEAKzxJ0c79ymPDCqU8COEEKIz3vjGEu3yWvgxSWdBOY+jKfyA8ZCj9X3uVvU5CT/Cy0zT/JVlWZe5XYcQQs4Aedq/19WNAnDA7ToOM9QgkPEYgacAYA38Sjv6CbfLaibhRySB0wEkXZ8OIfoiCUAetbfGdruE1ojyDOBxgMcAcMB8u3b4H26XBUjwEUII0X1yCcyDlm2pz3O7hpaUQaNMg54kwhgwwpr5+7aEHyGEEElMzgB5jNf6/JAyJhqK/8KMISA0aq0XaI2P3K4LkPAjhBCi5yQAeYjXwo9hmjMI+s/MyGFQDTSu0xor3a4LkPAjhBDiyEgA8gCvBR8AUCYdT9B/BJAOxkGGc412sM7tugAJPyKpPcHMm9wuQgghAch1ngw/ik9RUA8C8BPoADOu0hquf2hL8BHJzrbtRW7XIISIkE7QLvJk+DFwjlLmIgB+gHfaOnyZrR0JP0IIIfoUCUAu8WL4sUxcqkj9BmAThM1a02WsleuTIEr4EUII0dvkEpgLvBh+lKm+xcAPARAzlzHoW1rrKrfrkvAjhBAiHiQAJZgXw49pqW+D8UMAYHCxdozvMOw6t+uS8COEECJeJAAlkNfCD2uDfJa+hRnfbGp6n0LOd1lxwM26JPiIvso0zeNt264EsNntWoTo76QPUIJ4LfyYDMO09F1MFAk/jH9pHZpvKyXhR4j4WWxZ1tVuFyGEkDNAcee14AMAyqct2OZviXBGU9NLUOatOqwdN+uS8COEECJRJADFkdvhh7VBhkEjSOlxBBy0A9hskFZkGIugMKdprafDIfVLUiFXZ6iW8COEECKRJADFidvhx7SMfDDfDfDkw22pqAFQC9AIAGCNPzma7yPl6okfCT9CCCESTgJQHLgdfhQb46D5zyAMiFqUBagsAMzAPY7Wj7tRXzMJPkIIIdwinaB7mdvhBwDI5O/GCD+tVmHN/0xYQTFI+BH9ERHVMLs7ylIIESFngHqRF8IPABDxHIA6Xkmp46GdfyemotYk/Ij+KhwOn+Z2DUKICDkD1MeYls8AKKOz9QjISUQ90ST8CCGE8AI5A9TH2OGQYxp0EES5Ha2nHdqTqJoACT5CCCG8Rc4A9TGKKQ2g+k5WqzCcUHFCCoKEHyGEEN4jAagvURhOFj0NwuiOVtOghYm647OEHyGEEF7kziWwcznzeL7iplyqLMjVBz75feqKBwY+j+pYq6af9d6wY9SjPxxItdPSULPjy3rTg99+bc86QGHi3Jtum4wtpzd39zVQGf7UXvo/W17HgQQejSdYyihi4gcB5AJwAH6EmYYQ4XRE+vsEAZRp8APa1isSUZOEHyGEEF6V+DNAd9ympvG1T03DxtlZSH16I00r+H+N054J3xGjlpNHp0wyHnljCraOyGQ8uoPzq/+pJny05Sz/JNwRVCmo/MpRtL+YiP5KRH8F8ZPZBjq7/NPnWAZdwgp/BSEXjGrN+LZt84OOo2+zbT1LAyeAzONsW1+mbY57+Fm/+MKNY3L9jfHejxDJxrKsJ03TXOB2HUIIF84A+VZeOXUYrviixcsn/XXJ8gqcffd7Su3atGbVpmOA8KqW66ZkPjB7NO7KGVFXetUv3kcACL487dwFxzyjNl9YsId+C+wdfZuz6jt5r4XWJfo4vIAM+BQZCxl8IcBgxkYG36Ad/qzletrWVRqhhNQkZ32EaB8zTyWinW7XIYTo9GYxvS/r3IcuP18/ev3Igk+/cPdCaNxxm8pfueu9q/HPJ29eUv1Yy3X9Z/9h3CXqD9P+sqTsNRPgyLq7372cX33+l84lzx1jfrp5HPIeOIiamZmo2XqBseHBS1/av6Wj/RcXrleRxAAAHGVJREFUF98FYFA8jm3zgVB2b2zHMmhkiqVOagg67zoc+3LewXon9bnSmjmVjfZAABiRbe6ed1zOf9P9FO6NGnpiwmBfy8uY5wF42a1ajlAmEX2dmZcBKHO7mB46FUAxgFq3C+kJIroSwFZm/qCrj6mrq+uV919vUEpNBlCvtW4VdjZv3nxBamrqrhEjRiTkMnRPmaZ5CgCfbdtvAkBGRkbMLgpeRUR5APKYucTtWnqCiE4AcDQRPaq1drucbiMiH4BTmfkNl+tYUFhY2O53YoLPABFSUZ+bCrtq4ULw3QCw8B4dnnttVQOl5hKq0XJGzuBrN5Q/CZQ/CQDnDEubvqrmF5NRNvRx68Dfgrh4fAo2Whm8zapB3qM71MgznnH4P3vn1swatiSwtd0KiM4CcFQ8ji7dp4ze2A6DLQBIsdQsAG0m6tpaGTKeLalOqwtqIgJOGpcePHNaRgYBp/fG/nsiL8eKrjMTwDw3ajlSzKwAgIiOBTDV5XJ6Kh3AYADJ9+kZYRHRGABDuvoA0zR75f3XS3zMzKZpzmjZSESWaZojTdPs8DYVbmPmdKUUTNM8EwCIyN0JA7vPZGaLiMa6XUgPpQIAM88jSvh5it5AANKJyNXvgOzs7Js6Wp7wS2A2U9gh8n3+qdxABhb4obXdziNowtyfzRuJtb8eh/8uu5bWnnzCP3EQ8/YeGnVg48CH398WGc10x22v5a+cNONR3nIJYc+v25vavLCw8LhePqTDeutO0Nd/YeAZ44ek/P7T3YFvPbW8amXLZZZBlzDodhAIQL1m/Oj9DbVvv7/BnT/027vkVVpaurSgoOCkRNfTG5YvXz7WMIxyAD8pLCx8yO16eqKkpORpx3FunzVrVrt/DHhZSUlJFYAXCwsLr+nqYxYtWuSJO7EDwOTJk68Oh8O7ysvL32zZbppmcXV19VsVFRW3ulVbV+Tn5z8BIHv16tXnA8CCBQuS6tJ2aWnpqQBOKSwsvN3tWnqipKTkPgA/KCgoyCWi9r7OPGvVqlU5jvP/27vz+Cjquw/gn9/s7GYDmwQCBOQMQgiXIiYRz4raqkgSQI1nxdYDq6C0Hq320fLQqlVbpSpaH7W2ttWCUDkSoLQIWCtKsyFCwxEKCRAOI0cISUg2OzPf54/ZaLiTZbMTks/79crLOBff2Rz7yff3mxnzvfT09LFO13IyUQ5Agmr0K61ATG/XaLiwEgZG/9PlwcHeZ6Gq9Nivcr0alPXIi+fCf9VobfutDy7Yufqd0Jr+gS+6dkoUDYB9Q7/pv7Tqsx7cUQd3fPTOJ3p0t8cFMR4XYCIAQGS7aaoHBNYWp2rifB8iIjpTRf0qsIBV+PlOdO+c6+t0KQB09gUvTEJZ0j9Q+wmgcN748Z2mjU72AkBs5ucZA/D5hBL59KopC3aubhyQDlpnXbUr2O2jy8fbj3RIHFPduwtKvnWetn/FGReXT8GjSSIs4w9oCD/AP2GZNzL8EJ1xnhWR+U4XQURO3Ado0QsVu7N+9fAbSs0anxWzvg4vD78Cux59Ig/7MOk1t7ZnRUFsfM0rCurlTtqKqzzSuWtvlfVJr6yGAwgypODFBT3feXfjngu+fbbZZVN2ZuzWoLohZZgqnTF+Yc2yqJ9TC1JKDRVNew1ATwAiFt4OivGSJppjczsYfojCYxjGPKdrICKbAzdCFJTlPvoXa8LMvw8xFqVcK2u3PJq3Zx8A4M1Jhpa54lZDrF0Cga4FP7BM96oj9zehuVRJwZuFQaDwrkNjX+88RM3tf71329b75pRU/jr6J9Ri8rfVXqK5tHsE4gWk1lL4iWXJUs2hG3gz+BARUVvh2MNQd82bsn8XsP/Ido0u/jz8u+G6xbL5T28tA465rD230ec7Fj1QsQOoWHr0Rmcw0xRtyYYqbNlfPyU0/38PRE22DGu9UzUx/BARUVvCp8G3MpqmOs1dW3X/oYA9wiWQfFPJVBjY71RNDD9ERNTW8GGorYhL01I1DX89FLBSAaBTB9dHYgW/hyDDDxERUSSxA9RK6Lp2LSDPASpWUzBuOC9B1zW8/afVwRPcH6llMfgQRZ6u6xMA7DIMo1XfCZqoPWAHyGFiuZTu1u4FMANQsQDKLz27w8tpfWMdq4nhh6jF/FQpNd7pIoiIAchRmubq6HbLTAgeBaAJUGgE9etTkzzbnaqJ4YeIiNoDDoE5ROmufpqS1yEYCAAWMBua8Qsoy7GHmTL8EBFRe8EA5ACXS/sWgBchiIeICU3NsILWW0415Bh8iIiovWEAiiKxXModI/dA8DAgGgQVJjBVgtZqp2pi+CEiovaIAShKNFEdNF2eg+Ca0KINhiWTIbLbqZoYfoiiSym1URz8mSeibzAARYOGs5SmXgMwzF6g8qTOfBI6ap0qieGHKPqCweDEU29FRNHAANTC3JorQ5S8DKALABMKM4yg+ZZTrzyDDxERES+DjxBR505Z2F8pNdRl4Osb+Lhd6mbR8AcodIGg0hLcawStt5yqkuGHiIjIxg7QaRE1bOqCHyos+KkFdHVBAS4FF6wVgKtOIGMAgQg2C+QBy5Qypypl+CEiIvoGA9BpGD51wdMAfnr0cgXtCkBCn6vlpqkeExjV0a4PYPAhIiI6HgagMJ33w3nJhhwbfhoTkbX1ljFZg2ZFq67GGH6IiIiOjwEoTIalXQslJ91GKXTQJPrhh8GHqHXSdT1fKfWPYDB40j+eiKjlMQCFSSlJOnn8ASCqa8NQWDQw+BARETUNrwILl8iXp9wE2BuNUgCGHyIiouZgByhMoqslME++jVJY1tJ1MPgQERE1HztAYSp6aXwZFJ484QaCUiX177RkDQw/RERE4WEAOg1Fvxn/jEBNArCj0eKAwFpoaNbtQVOvaol/d9Nr129m+CEiIgofh8BO0/qXx70F4K1zH/0wyQxqI5XSd5jB+lMMjoWHoYfojDfRMIxDThdBROwARcy6X1//lWlYpQbDDxGdgGEYG0Vkl9N1EBE7QK0egw8REVHksQPUSvWI13H1EJ9jzw4jIiJqy5TTBURbfn7+QqVUz5Y49o4D9d5IHKdPZ3esUupsESlWSjnyDLHTpZRKFZFip+sIh4jEKKWGi0iZUuorp+sJh4j0B7BbKRVwupZwiMh5mqZViMj2pu5z+PDhiPz8RUgXAEEAZ+p8n2SXy6WZplkCAB06dKhzuqBmigt97Ha6kDD1BtAdQIHThYTJBaA/gC1OFuH1ei8ePnx4/YnWt7sA1JIGT/5w0Ons3zDclZ+ff4NSaq6IXJqRkfFpZKqLroKCgk/T0tIucbqOcKxevbq/y+UqAfBQenr6q07XEw6/3/9n0zSfGjVqVKnTtYTD7/dXKKU+TEtLu7up+8ycOfO0fv4iKTU19a5gMLirpKRkqdO1hGP48OHvapqWsG7duvEAMGXKlDNqKL6goOBKEbkiPT39KadrCYff7/81gEfS0tI0pU7xzKVWqLCwsJNpmu+lp6ePdbqWk+EQWCvBuT5EbZ/b7f6prusTnK6DiDgJ2nEMPkTth4hMUEr5AMxzuhai9o4ByCEMPkRERM7hEJgDGH6IiIicxQ5QFDH4EBERtQ4MQFHA4ENERNS6MAC1MIYfImqglJonIhudroOIGIBaDIMPER0tGAw+63QNRGTjJOgWwPBDRETUurEDFEEMPkRERGcGdoCIiIio3WEAIiIionaHAYiIKEp0XR+ilOrldB1ExABERBRNf9R1fbLTRRARAxARERG1QwxARERE1O4wABEREVG7wwBERERE7Q4DEBEREbU7vBM0EVH0XCUiQaeLICIGICKiqDEM45DTNRCRjUNgRERE1O4wABEREVG7wwBERERE7Q4DEBEREbU7DEBERFHidrtfc7vddztdBxHxKjAioqgRkQuUUpVO10FEDgWgLmM/HDJUzX4lXlWn+XBo7QSr6MFbFlUUNXfb5hyHiIiIqEH0h8BynvL01WbPulCtXTWoftDAL3DRsrla8qzJYxDTrG2bcxwiIiKiRqIegGIDl2X0wNauy2TT8zOWzjhQXJX64jb0jr/a7b24Ods25zhEREREjUV9CMwjRYN7oG7z+WmoK8wDsPL2wOGsVZs3Wh2HKtStkCZuG6uK6pp6nMby8/M/Vkr1bvETPQ0i0hEAlFIf+P3+OqfrCYeI9PT7/VudriNMOgCIyDS/3/9Dp4sJU5LL5brM7/cbThcSpngRyfH7/aObukNtba27Betprjiv12uMGDHiscYLi4uLfT6f79pevXpd4FRhTaGU6iYirhEjRiwDAL/ff0Y9vkNEYpVSXr/ff5vTtYSpCwAUFBRs8fv9TtfSbJZlaQCSnH4PSEhIGJqSkhI40fooByAFL+riYmBUvzAdlr3MJyYmVdXDE9f0bWPjYlDnbtpxjvEfAOWRPKsW0BtAdwDFAPY5XEu4EgAUOF1EOESko1Kqr1JqB4AtTtcTplEAigDUOF1ImPrA/t5v8veQaZqn+tmPGpfLlWxZVq2IHPG7pnPnztW6rh82TXOvU7U1haZpGZqmuQ3DWB9aVOVoQc2klEoSkSTYPwNnHBEZoZQ6k3+HumH/DnK0/srKSutk66McgARBia0OKJevdho0fTosoFq5MDnOo4yapm8bqAlKbG3TjnOkjIyMKS15hpGQn59/A4C5IvJURkbGp07XE46CgoJP09LSbnK6jnCsXr26v8vlKgHw+/T09Fedriccfr//z6ZpPjVq1KhSp2sJh9/vr1BKrUhLS2vyJeMzZ84c1JI1NUdqaupdwWBwV0lJydLjrS8rK4t2Sc0yfPjwdwEkFBUVTQWAKVOmbHa4pGYpKCi4EsAV6enpTzldSzj8fv+vATySlpZ2s1LqRAMarVZhYWEn0zTfS09Pb9XvAVEfAjssKcV7VeyAdz+GB0AdxizzeLFvwEDt0Majv8on27baSAk09ThEREREjUV9EnSdteTfu9Dv0A5f8iQZLXo/fc3d/dTO+oc8gU+BenV+ds61v8zuNvBU2578OEREREQnFv3L4Je8FiiVnNuXq1HfzYrLOnAhln3/Juy4Zfcc1GLS2zoErylgrDrVtidbR0RERHQSjtwI8WDeLWs/Ab6+CmJ2wydvPhBcAwxY05RtT7GOiIiI6ET4LDAioihxuVxXuVyuc5yug4gYgIiIokYp9Zymabc6XQcRMQARERFRO8QARERERO0OAxARERG1OwxARERE1O44chk8nZymaTUiUqJp2hn5IFQAEJHdTtcQLhEJAigRkUqnawmXUuqr0HmcqbaJSLOel9WazlfTtAqlVNXRNWmaViYi+1pTrcejlCoXkdrWXueJKKVqRaTC6TrCpZQ6ICIlTtcRrkAgYLnd7i+droOIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIqPkMdUHmpSOCgHK6EiIioraON0JsJWLGuvr7VN2C6TkYhDmoBwBMe1IbvKbi8b7Yfa8PNVoP2flOYtqGXzw9HZbD5bYhhkrJ/Ml9/dS2H8eiNqkDqr+4Uit+5L4F5asBhT7Zz2SnSOHPfajqnaD2/22hlj+lcj4OOl11m5EzyzU08M+nesueu2KlLr4DKv91h75+6nXzK7fy9Y+y7Mfi0mT7qocw/8k7c+sXAECXsR8OGapmvxKvqtN8OLR2glX04C2LKoqcLrUt6ZL9wv0Xyievf/NYBgtjZfktP8irnY2cTglpdeN+0w0VYzuiunwktv7vz3K3/5VvAJHBR2E4rGP2590vzbr96YvVzX9PBLyN13Vdc9bNQ2TNXd+11mUVyaRr1miDb0ss7HYHW0SR48taeMVAlT99jPznXq93XK+1clFenpU8/65rkBiTXT7wbFn+u0ysmVajJg5bhxEd7jRSXmSXLnK61e25Y5gU3JilbRxbE/twvy/UyD1zjT5vBadB4+sfTUE10Ao+fxaqh369KOcpT19t9qwL1dpVg+oHDfwCFy2bqyXPmjwGMQ4W2sZoiJP9KYNRPMNtmsmmaSabpiQr1OYCOgYEvv/cCFnb7S7z0LmFKuvxlej/262ZnsFOV91WMAA5TLlM8aiqXabqMrdOGnd2AioJX9yRhm2v37loa9HmvJxNWzHq1SJJmhicxq9bZGjogvwxQ9SuBY/lbf5ozpz7KjfFul/ajW7WuBjfiETrjRuHyM5VU3K3Lvxo4W3lG4zJP9+gEseVjkGc05W3DRriUTZwkOx686EFm/6zbM53KktxzZ/LtZiUmzcM1fn6R09S5jvjRqJw8EHEbWxYFhu4LKMHtnZdJpuen7F0xoHiqtQXt6F3/NVu78VO1tq2uODFwYFny5cFHy5evH1x6OO+PBxG5vc6JMqGG+5W66fftHjllyULpyzeqYZ+/Hsk3cy/ACKDb6QOq553yVfLFy787Wdy9wdBBfl6xaTf6V7ZO2iw68A6e6GgyhpUtBfelJs2cOgyMiy4jeoX4gKBxxuSp+/wPQN8OBSbLR23+bQDw7uiam0M7K9LsGNN8SHx6fUud38Hi25DLGzNfenJZ/J2vhJ3zUuJl4+957LhmPfQABzKmz2nKMjXPzpiM6VXqpr99I+1PvdXQatvWO6RosE9ULf5ujTYzyRceXvgMJI2b7Q6DuUbcISMXqLHyMHkFWr0vddkZR+4PuuabfdnDf2ZNRq6B8/19eFgzOuB4AZ7Y49Uofu6A+g4jG/ckcHXsbWq2K001HVIhFXVsMiUs6rqoHXsUc0hgEjZsuTVvdOX7jwAGGpA5s8mpGtTF18mZb/Uc/eXalLvi9XMRg9E/ZtpwXN4t6b7nKu4bfLE1F8Uq1X8vLuUXXQWjOUx8Ahf/yjIud51tpr4RpZa/9ILMTVbvlmh4EVdXAyM6he+nnPoExMxVfXwsAMXKd0ma27U7Oujtsy93nu4/xcYk7MWQ+98xtfzR7q2yeeGVZeZgK8fSGuIu6peuXy1HAaOCHYSWqvOPcWq89buN10+hL7/XWpPXAys2kRfo04RnbaEsXlnD1F3/l9ftSNxpJR9/3/ytq20oMFSnuo60eO/3nDvu5rmS+3QGcZhB8ttk/YtfHzR34BFCZmfnV8rj67oMab+M77+LU2hZ+D8+0fh/cDDI8v/oG+AGvH1OkFQYqsDyuWrnQZNnw4LqFYuTI7zKKPGwaLbljnF9X4UX+kHAGwA8FF+TdYzr5aqTRNGSvfFQWjeg7XQAfvCGF0F4zxi1XYA3wMigR2g1urNu41adNmyVcWF2s0KHbX/DumGwBYZCsPh6toM73W7+52jvbF8tMpfPMv7yQVP5G1baf+5K6iWhA374BtWH/pry5Pw95R4VW2WacFSR4tuK6YZ2vCsiX98PTt+bMOiSizeVIVYa6GrIomvf0tT8Fn7L9mLATdMWJNlZtUZRl9Uj5yLa+b/KHPQX0RSivcidsC7H8MDABizzOPFvgEDtUMb+e4bGbFj/tp7fNbIO4xG8zoN0YMarMDUqgHbaxAfSNfcqfYaHR1l77BOUrPedKrgNoYBqNXyyj417H0/ku8rv65bj27XlfToL/k/GCp733uWl8FHiIbu2isPnouST2rV4PfHB7K7Zmdnd58w4eok/yRxH1CT/roJPS+bPy7pouTRl3sHWK88NhgHFmfNR+Wpj02nNN1jVUrfbatk0BPzx/Xsc1FOWWwq6h7uIxX7z8fhTXz9W5qFzXkzbs3NzVW5ubkq16vrO+ArvBFLx8/I23xrhbXk37vQ79AOX/IkGS16P33N3f3UzvqHPIFPna68rah1vVK3R3o+/+yaAfdITo6n97g3zhmkVk9Jxf7ZOSvNmgoZkvs7SXn08tHJ3u5Zsy7shY1X3CblHzCARgaHwFotwd6RD/1pw5otKXe4eq27GPerXih7u09s+Tv85o+QaU9ocWvK08owYDREvtuw2DRMc3957LcCC/usKs2c9tBvrU7vnRNXl9gZ/mXP6psnudl+jhALZSh8br2M6LrX6l2YVDtJ76+qVl2nlWZrC3AY6FPM199BS14LlGbOun250t8qiMt6+kIcKh6PHbfMm4Nap0trM/I+3leaOfOG5dLxmc9q6164QJtT3g87Xv5hbvk7Cm5BUB5L8Ex8M8lX+eUleL3iHNnyo+GL6nkfJiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiImqqB2Dfs2fGcdYpAHkActEyzzUaDOAwgPNPso0bwFYAUyP8b58HIC3CxySiCOOdoImopWSE/nsrgPij1rlhBwU/nLuxoQXgH7BDUCQ9AuB/InxMIoowBiAiagkuACMBbALQBcCEo9b3BdAVdgByigngB7A7UURERESnLRFADexhsLUA/oUj/+C6EUAdgN4n2D8ddndmP4C9sIfKzg6tiwFQAeD2o/b5PYCFoc8bhsByACwJ1bIHwHOh/YHjD4EpAFMAFIf2XwfgezhymC4WwK8A7A4d92MAF4fO71+wO1oSOr+kU5wLETmEHSAiagnnwn7W4L8BvA1gFOwhrwYZAMoAlB9n386wQ4IJYCKAybADzTto3u8sF4A3AWyHHZbegz08NQMnnnf0YwAvAJgNO6QtDx3j/tB6FTqfuwA8C+AmANUAFgPoByALwFzYoasvACNC50JERERngEdgd2k6AugW+vz10DoFuyMy5wT7XgwggG/mEAHAt2EHEx1N7wDVA3gfR4ad52F3bXri2A5QZwD7ADx51HF/C2AHAA/sYBeAHXwaJIT2ezD0/38C8GETz4WIHMK/QIioJaQDWA+gFvawz1zYoaEzvgkS+SfYtwT28NNMALcB6AFgGezujNGMGgTABzhykvW7sIPHiONsnwYgDsBK2POWGj5WwB7K6gPgEgBBAIsa7VcJIBnAWy14LkQUYQxARBRpOuwJ0GtgX2kF2OEgAfacnIGhzwtOsP+XAMbA7qr8DvZcmy9w7ETqU7Fw7BDbl7ADUdxxtk+CHc4+Cf3bDR+zYQ+nxYe22Q+7u9RYNew5Py11LkQUYQxARBRp3WB3RBp3eApgX/F1D+zukAV7gvGJfA5gLOzJ1N+BPVT1PoBhJ9nn6EvtNdiB5ejaAODAcfavhj1c1Rv2sFnjDzeAQtjdnk44dvjqXACDInguRNTCGICIKNJGwA4NhY2WmbC7QCNhTyjeCnsez/HcDuA/sIfLagF8BHtOkQa7ewTYXZzERvskALjgqOMo2B2nxnOAJoaOWYhjFcIelrr6qOU/gj0Z2g3gM9hXgX2n0fo4AH/DkfOCmnMuRERE1AY8CeArAN6jlifAHpISAH88yf7nwB5O+hB252QM7Cup9sGevOyC3VUpAXAdgMthX4Vl4NhJ0AaAV0PbPRda9ovQNkdPglahbQ8CeALAVaH/HoYdggA7uOSGzuM+2GFpXmifhkDzLuzu1wjYge9k50JERERtxHzYE32Pd6n5DNgB6MHjrGssB/b9gwKwJ1EvxZEdnqGwJyfXwB5O+xz2VWaNA1A17A7M57BDTBHsQOMKbXO8+wC5AUwDsA12x6YIdtBpfC7xsCc1fwV7SOyfAC5rtH5CqOYK2Dd7PNW5EBERETWLhm/m9TSXG3YXKdLPAiOiMwDnABHRmcyC3VUJR0/Yl7kf7+otIiIiojYnE3Z4+i/sOzgTERERtXkdYV+qz7sxExERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERETXD/wNvg786HKWflwAAAABJRU5ErkJggg==" /><!-- --></p>
 <p>The shaded horizontal band along the curve is the Monte Carlo
-interval, the binomial standard error of each power estimate over its
-converged replicates widened to a 95% envelope. The vertical band is the
-solved sample size and its own interval, which is what the dashed target
-line invites the reader to guess at.</p>
+interval of each power estimate, the 95% Wilson interval over its
+<code>n_returned</code> replicates. Unlike a band of 1.96 standard
+errors either side, it stays between 0 and 1 and does not shrink to a
+point when power is 0 or 1. The dashed vertical line marks the solved
+sample size, and the vertical band marks its interval.</p>
+<p>The solved size counts the subjects whose data are analysed.
+Simulated data are complete, with no attrition or exclusions. A study
+that expects to lose a proportion <em>p</em> of its subjects therefore
+recruits <em>N</em> / (1 − <em>p</em>), which is 67 for 60 analysed at
+10% attrition. Losses unrelated to the outcome cost power without
+biasing the estimates, and recruiting the extra subjects largely
+restores that power. Missingness that depends on the outcomes that would
+have been observed, which pilotr does not simulate, can bias the
+estimates as well (<a href="https://doi.org/10.1093/biomet/63.3.581">Rubin, 1976</a>).</p>
+</div>
+<div id="a-sample-size-justification" class="section level2">
+<h2>A sample-size justification</h2>
+<p>A preregistration, a registered report or a grant application has to
+justify the sample size it asks for, and the solved size is only part of
+that justification. <a href="https://doi.org/10.1525/collabra.33267">Lakens (2022, Table 4)</a>
+also asks for the primary analysis with its alpha and sidedness, the
+desired power and each effect size with the reason it was chosen. For a
+true null hypothesis, Table 4 asks for the power of a test for the
+absence of an effect, such as an equivalence test. pilotr reports the
+counterpart for the planned test, its Type I error rate. A simulation
+adds items of its own: the number of replicates, the fits that were
+singular or carried a warning and the Monte Carlo error of every rate
+(<a href="https://doi.org/10.1002/sim.8086">Morris, White and Crowther,
+2019</a>). <code>power_report()</code> writes all of them in Markdown
+from a power result, the <code>target_n()</code> result and the
+specification file, whose seed and checksum it records. The
+justification below is illustrative.</p>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>spec_file <span class="ot">&lt;-</span> <span class="fu">file.path</span>(<span class="fu">tempdir</span>(), <span class="st">&quot;priming.json&quot;</span>)</span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a><span class="fu">writeLines</span>(<span class="fu">spec_json</span>(spec_c), spec_file)</span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a><span class="fu">power_report</span>(pm, <span class="at">solved =</span> solved, <span class="at">spec_file =</span> spec_file,</span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a>             <span class="at">justification =</span> <span class="fu">c</span>(<span class="at">effect =</span> <span class="fu">paste</span>(</span>
+<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a>               <span class="st">&quot;A difference of 0.06 on the log scale, about 6% of the reaction time less&quot;</span>,</span>
+<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a>               <span class="st">&quot;its shift, the smallest effect of theoretical interest.&quot;</span>)))</span></code></pre></div>
+<pre><code># Sample-size justification
+
+## Primary analysis
+
+- Model and test: lmerTest::lmer, Satterthwaite t
+- Significance level: alpha = 0.05, two-sided
+- Simulated units: subject 24, item 18
+
+## Desired power and sample size
+
+- Desired power: 0.8
+- Sample size: 36 (95% confidence interval 32 to 41), the exact solution 35.61 rounded up
+- Fit: a probit regression of `power` on the square root of `n_subject`, over 7 points from 8 to 56
+- Heterogeneity factor: 1.00, the dispersion that scales the variance behind the interval, which is 1 where the curve fits the probit model
+
+## Focal effects
+
+The rates below are those of the simulated design, each over the replicates that returned an estimate for the effect.
+
+### `effect`
+
+- True value: 0.06
+- Justification: A difference of 0.06 on the log scale, about 6% of the reaction time less its shift, the smallest effect of theoretical interest.
+- Power: 0.800 (Monte Carlo standard error 0.089; 95% Wilson interval 0.584 to 0.919), from 16 of 20 replicates
+- Type S: 0.000 (95% Wilson interval 0.000 to 0.194)
+- Type M: 1.202 (Monte Carlo standard error 0.068)
+
+## Monte Carlo accounting
+
+- Replicates: 20 simulated, 20 returned an estimate
+- Fits: 8 converged cleanly, 12 singular, 0 with a warning
+
+Each rate&#39;s Monte Carlo standard error is sqrt(p(1 - p) / n), over the n replicates that returned an estimate, and its interval is the 95% Wilson score interval. The standard error of Type M is the standard deviation of the exaggeration ratios over the square root of their number.
+
+## Reproducibility
+
+- Software: pilotr 0.4.0, R 4.6.2, lme4 2.1.0, lmerTest 3.2.1
+- Specification: priming.json, MD5 checksum 7cc70e3fb12f0236d8ec807b28c6c313
+- Seed: 1</code></pre>
+<p>The rates in the report are those of <code>pm</code>, the 20
+replicates at 24 subjects above. A justification to submit pairs the
+solved size with a run at that size and with enough replicates for
+planning. It adds the same analysis with the effect set to zero as
+<code>null_result</code>, whose rejection rate shows whether the test
+holds its level in this design.</p>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a>at_n <span class="ot">&lt;-</span> spec_c</span>
+<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a>at_n<span class="sc">$</span>units<span class="sc">$</span>subject<span class="sc">$</span>n <span class="ot">&lt;-</span> solved<span class="sc">$</span>n</span>
+<span id="cb24-3"><a href="#cb24-3" tabindex="-1"></a><span class="fu">writeLines</span>(<span class="fu">spec_json</span>(at_n), <span class="st">&quot;priming.json&quot;</span>)</span>
+<span id="cb24-4"><a href="#cb24-4" tabindex="-1"></a>null_n <span class="ot">&lt;-</span> at_n</span>
+<span id="cb24-5"><a href="#cb24-5" tabindex="-1"></a>null_n<span class="sc">$</span>fixed<span class="sc">$</span>coefficients<span class="sc">$</span>effect <span class="ot">&lt;-</span> <span class="dv">0</span></span>
+<span id="cb24-6"><a href="#cb24-6" tabindex="-1"></a>report <span class="ot">&lt;-</span> <span class="fu">power_report</span>(<span class="fu">power_mixed</span>(at_n, <span class="at">n_sims =</span> <span class="dv">500</span>), <span class="at">solved =</span> solved,</span>
+<span id="cb24-7"><a href="#cb24-7" tabindex="-1"></a>                       <span class="at">spec_file =</span> <span class="st">&quot;priming.json&quot;</span>,</span>
+<span id="cb24-8"><a href="#cb24-8" tabindex="-1"></a>                       <span class="at">justification =</span> <span class="fu">c</span>(<span class="at">effect =</span> <span class="st">&quot;Why an effect of this size matters.&quot;</span>),</span>
+<span id="cb24-9"><a href="#cb24-9" tabindex="-1"></a>                       <span class="at">null_result =</span> <span class="fu">power_mixed</span>(null_n, <span class="at">n_sims =</span> <span class="dv">500</span>))</span>
+<span id="cb24-10"><a href="#cb24-10" tabindex="-1"></a><span class="fu">cat</span>(report, <span class="at">file =</span> <span class="st">&quot;justification.md&quot;</span>)</span></code></pre></div>
+<p>Each rate’s Monte Carlo standard error and Wilson interval are
+computed in the report from its counts, and Python’s
+<code>power_report()</code> writes the same text, byte for byte, from
+the same counts.</p>
+</div>
+<div id="subjects-and-items" class="section level2">
+<h2>Subjects and items</h2>
+<p>The curve above adds subjects and keeps 18 items, and in a crossed
+design the number of items limits the gain from more subjects. When the
+effect of the condition varies from item to item, as it does here
+through the by-item slope in the specification, part of the standard
+error of the effect comes from the items sampled. That part shrinks only
+as items are added. As subjects are added, the standard error therefore
+falls towards a floor set by the number of items. Power at a fixed
+number of items levels off below 1 (<a href="https://doi.org/10.1037/xge0000014">Westfall, Kenny and Judd,
+2014</a>; <a href="https://doi.org/10.1146/annurev-psych-122414-033702">Judd,
+Westfall and Kenny, 2017</a>). In the priming design, the floor is the
+by-item slope standard deviation over the square root of the number of
+items, 0.02 / √18 ≈ 0.0047. The effect of 0.06 is some 13 times that, so
+the ceiling lies far above any target.</p>
+<p>Where the ceiling is lower, a curve over subjects flattens towards
+it, and the probit curve that <code>target_n()</code> fits rises towards
+1 and cannot bend into the plateau. A curve that levels off near the
+target can then be solved far from the true crossing. One that levels
+off just below the target never crosses it, but Monte Carlo noise can
+lift a simulated power over the target, and the curve can then be solved
+as though it crossed.</p>
+<p>To compare designs that trade subjects for items, sweep the number of
+items at a few subject counts and solve each of those curves for the
+number of items. Power over items levels off in the same way. As items
+are added, the standard error falls towards the by-subject slope
+standard deviation over the square root of the number of subjects, which
+at the smallest subject count below is 0.04 / √24 ≈ 0.0082. The effect
+is some 7 times that, so these curves too can rise well past the
+target.</p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a><span class="co"># Not run here, since it fits 3,000 models: three subject counts, five item counts and</span></span>
+<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a><span class="co"># 200 replicates at each. Each solve gives the number of items that reaches a power of</span></span>
+<span id="cb25-3"><a href="#cb25-3" tabindex="-1"></a><span class="co"># 0.8 with that many subjects.</span></span>
+<span id="cb25-4"><a href="#cb25-4" tabindex="-1"></a>pairs <span class="ot">&lt;-</span> <span class="fu">lapply</span>(<span class="fu">c</span>(<span class="dv">24</span>, <span class="dv">36</span>, <span class="dv">48</span>), <span class="cf">function</span>(n_subject) {</span>
+<span id="cb25-5"><a href="#cb25-5" tabindex="-1"></a>  spec <span class="ot">&lt;-</span> spec_c</span>
+<span id="cb25-6"><a href="#cb25-6" tabindex="-1"></a>  spec<span class="sc">$</span>units<span class="sc">$</span>subject<span class="sc">$</span>n <span class="ot">&lt;-</span> n_subject</span>
+<span id="cb25-7"><a href="#cb25-7" tabindex="-1"></a>  items <span class="ot">&lt;-</span> <span class="fu">sweep_spec</span>(spec, <span class="st">&quot;units$item$n&quot;</span>, <span class="fu">c</span>(<span class="dv">8</span>, <span class="dv">12</span>, <span class="dv">18</span>, <span class="dv">27</span>, <span class="dv">40</span>), power_mixed,</span>
+<span id="cb25-8"><a href="#cb25-8" tabindex="-1"></a>                      <span class="at">n_sims =</span> <span class="dv">200</span>, <span class="at">.name =</span> <span class="st">&quot;n_item&quot;</span>)</span>
+<span id="cb25-9"><a href="#cb25-9" tabindex="-1"></a>  solved <span class="ot">&lt;-</span> <span class="fu">target_n</span>(items, <span class="at">target =</span> <span class="fl">0.8</span>)</span>
+<span id="cb25-10"><a href="#cb25-10" tabindex="-1"></a>  <span class="fu">data.frame</span>(<span class="at">n_subject =</span> n_subject, <span class="at">n_item =</span> solved<span class="sc">$</span>n,</span>
+<span id="cb25-11"><a href="#cb25-11" tabindex="-1"></a>             <span class="at">n_item_lo =</span> solved<span class="sc">$</span>n_lo, <span class="at">n_item_hi =</span> solved<span class="sc">$</span>n_hi)</span>
+<span id="cb25-12"><a href="#cb25-12" tabindex="-1"></a>})</span>
+<span id="cb25-13"><a href="#cb25-13" tabindex="-1"></a><span class="fu">do.call</span>(rbind, pairs)</span></code></pre></div>
+<p>The pairs trace how many items each number of subjects needs, and the
+cheapest of them, given what a subject and an item each cost, is the
+design to plan for.</p>
 </div>
 <div id="parallel-execution" class="section level2">
 <h2>Parallel execution</h2>
@@ -499,38 +855,47 @@ line invites the reader to guess at.</p>
 <code>workers</code> argument that spreads the Monte Carlo replicates
 across local cores. Each replicate takes its own seed from
 <code>replicate_seeds()</code>, so the results are identical to a serial
-run whatever the worker count, and parallelisation costs nothing in
-reproducibility. The mixed-model fits dominate the running time, which
-makes the speed-up close to linear in the number of cores. In a sweep
-the worker pool is created once and reused across all sample sizes.</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="fu">power_curve_mixed</span>(</span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>  spec_c, <span class="at">subject_ns =</span> <span class="fu">seq</span>(<span class="dv">20</span>, <span class="dv">60</span>, <span class="dv">10</span>), <span class="at">n_sims =</span> <span class="dv">500</span>, <span class="at">workers =</span> <span class="dv">8</span>)</span></code></pre></div>
-<p>This design answers a serial bottleneck familiar from
-<code>simr::powerCurve()</code>, which this package’s maintainer
-previously worked around by splitting the sample-size grid across
-separate jobs by hand and recombining the results afterwards (<a href="https://pablobernabeu.github.io/2021/parallelizing-simr-powercurve/">Bernabeu,
-2021</a>). In pilotr the same gain takes one argument.</p>
+run for any number of workers. In the analyses that fit mixed models,
+the fits dominate the running time, so the speed-up is close to linear
+in the number of cores. In a sweep, the worker pool is created once and
+reused across all sample sizes. <code>power_design()</code>,
+<code>power_mixed()</code> and <code>precision_design()</code> also take
+a cluster made with <code>parallel::makeCluster()</code> as
+<code>cl</code>, which <code>sweep_spec()</code> passes to every point
+of an effect-size sweep in the same way.</p>
+<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a><span class="fu">power_curve_mixed</span>(</span>
+<span id="cb26-2"><a href="#cb26-2" tabindex="-1"></a>  spec_c, <span class="at">subject_ns =</span> <span class="fu">seq</span>(<span class="dv">20</span>, <span class="dv">60</span>, <span class="dv">10</span>), <span class="at">n_sims =</span> <span class="dv">500</span>, <span class="at">workers =</span> <span class="dv">8</span>)</span></code></pre></div>
+<p><code>simr::powerCurve()</code> runs serially, and pilotr’s
+maintainer previously worked around that by splitting the sample-size
+grid across separate jobs by hand and recombining the results afterwards
+(<a href="https://pablobernabeu.github.io/2021/parallelizing-simr-powercurve/">Bernabeu,
+2021</a>). In pilotr, the <code>workers</code> argument gives the same
+speed-up.</p>
 </div>
 <div id="a-bridge-to-the-bayesian-workflow" class="section level2">
 <h2>A bridge to the Bayesian workflow</h2>
 <p>For a confirmatory Bayesian fit, <code>brms_bridge()</code> returns a
-ready-to-run <code>brms</code> model. It provides the family, the fixed
-and random-effects formula, and a weakly-informative prior set, all
-derived from the same specification, so that the planning model and the
-confirmatory model remain consistent. Printing the result shows the
-model as code to copy into a script; assigning it instead gives the same
-parts as <code>formula</code>, <code>family</code> and
-<code>priors</code>, silently, for a caller assembling its own.</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">brms_bridge</span>(spec_c)</span></code></pre></div>
+ready-to-run <code>brms</code> model. It derives the family, the fixed
+and random-effects formula, and a weakly-informative prior set from the
+same specification as the planning model. The formula reads the contrast
+columns that <code>model_data()</code> adds, so the model runs on
+<code>model_data(spec_c, simulate_design(spec_c))</code> or on collected
+data passed through <code>model_data()</code>. Its priors are scaled to
+the response and to each of those columns, here on the log scale on
+which the coefficients of a shifted lognormal act. Printing the result
+shows the model as code to copy into a script. Assigned to a name, the
+result prints nothing, and its elements <code>formula</code>,
+<code>family</code> and <code>priors</code> hold the same parts for a
+caller that assembles its own model.</p>
+<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a><span class="fu">brms_bridge</span>(spec_c)</span></code></pre></div>
 <pre><code>library(brms)
 fit &lt;- brm(
   RT ~ effect + (1 + effect | subject) + (1 + effect | item),
-  data   = your_data,
+  data   = your_data,   # model_data(spec, simulate_design(spec)) adds the contrast columns
   family = shifted_lognormal(),
   prior  = c(
-    prior(normal(0, 2.5), class = &quot;Intercept&quot;),
-    prior(normal(0, 0.5), class = &quot;b&quot;, coef = &quot;effect&quot;),
-    prior(normal(0, 1), class = &quot;sd&quot;),
+    prior(normal(0, 0.3348), class = &quot;b&quot;, coef = &quot;effect&quot;),
+    prior(normal(0, 0.335), class = &quot;sd&quot;),
     prior(lkj(2), class = &quot;cor&quot;)
   ),
   chains = 4, iter = 4000, warmup = 2000, cores = 4,

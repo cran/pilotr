@@ -1,19 +1,22 @@
 # Auto-derive the analysis model (data and lmer formula) from a design spec, so that design
 # analysis and power can run from a spec alone, without a hand-coded formula. Interactions
 # "a:b" become product columns named "a_b". Categorical factors become their numeric contrast
-# columns. The response is log-transformed for the (shifted_)lognormal families. This targets
-# the lmer-fittable families (gaussian, lognormal, shifted_lognormal). Other families require
-# glmer with the appropriate link.
+# columns. The response is log-transformed for the (shifted_)lognormal families. The same formula
+# serves every family: .fit_model() in lmer_fits.R fits it by lmer, or lm() when it has no random
+# terms, for the continuous families and, as a linear fallback, for ordinal and beta, and by
+# glmer, or glm(), with the binomial or Poisson link, for bernoulli and poisson.
 
 .us <- function(k) gsub(":", "_", k, fixed = TRUE)   # "a:b" -> "a_b"
 
 #' Build the modelling data frame from a simulated data set and its specification
 #'
-#' Add the analysis response column `.y` (log-transformed for the lognormal families), the
-#' numeric contrast columns implied by the categorical factors, and any interaction product
-#' columns (an `a:b` coefficient becomes a column `a_b`).
+#' Add the analysis response column `.y` (`log(y)` for `lognormal`, `log(y - shift)` for
+#' `shifted_lognormal` and the response itself otherwise), the numeric contrast columns implied by
+#' the categorical factors and any interaction product columns (an `a:b` coefficient becomes a
+#' column `a_b`).
 #'
-#' @param spec A design specification (path or list).
+#' @param spec A design specification (path or list). A path is read with [load_spec()], which
+#'   validates it.
 #' @param d A simulated data set, as returned by [simulate_design()].
 #' @return The data frame `d` augmented with the `.y` response column and the contrast and
 #'   interaction columns required by the auto-derived model.
@@ -24,10 +27,22 @@
 #' head(model_data(spec, simulate_design(spec)))
 #' @export
 model_data <- function(spec, d) {
-  resp <- spec$response; shift <- if (is.null(resp$shift)) 0 else resp$shift
-  d$.y <- if (resp$family %in% c("lognormal", "shifted_lognormal")) log(d[[resp$name]] - shift) else d[[resp$name]]
-  for (f in spec$factors) for (col in names(f$contrasts))      # contrast columns from labels
-    d[[col]] <- f$contrasts[[col]][match(d[[f$name]], f$levels)]
+  # A path is read with load_spec(), which validates it. A list is used as given, without
+  # .as_spec(), because the replicate loops of the power and precision functions call this once
+  # per replicate with a list they have already validated.
+  if (is.character(spec)) spec <- load_spec(spec)
+  resp <- spec[["response"]]; shift <- .orelse(resp[["shift"]], 0)
+  yname <- resp[["name"]]
+  d$.y <- if (resp[["family"]] %in% c("lognormal", "shifted_lognormal")) log(d[[yname]] - shift)
+          else d[[yname]]
+  # Contrast columns from labels. Every factor's level index is taken before any column is
+  # written, because a contrast column may carry its own factor's name, and writing it replaced
+  # the labels that the factor's later columns are matched against, which left them NA.
+  idx <- lapply(spec[["factors"]], function(f) match(d[[f[["name"]]]], f[["levels"]]))
+  for (i in seq_along(spec[["factors"]])) {
+    f <- spec[["factors"]][[i]]
+    for (col in names(f[["contrasts"]])) d[[col]] <- f[["contrasts"]][[col]][idx[[i]]]
+  }
   # Product columns for the union of the fixed-coefficient keys and every random-slope key.
   # Taking only the fixed keys left an interaction random slope with no column to sit on, so
   # the formula from model_formula() referred to a variable the modelling data did not have.
@@ -41,8 +56,9 @@ model_data <- function(spec, d) {
 # Every interaction key the analysis model needs a product column for: the fixed coefficients
 # and the random slopes of every grouping factor, de-duplicated and in first-seen order.
 .interaction_keys <- function(spec) {
-  keys <- names(spec$fixed$coefficients)
-  for (g in names(spec$random)) keys <- c(keys, names(spec$random[[g]]$slopes))
+  keys <- names(spec[["fixed"]][["coefficients"]])
+  rs <- spec[["random"]]
+  for (g in names(rs)) keys <- c(keys, names(rs[[g]][["slopes"]]))
   unique(keys[grepl(":", keys, fixed = TRUE)])
 }
 
@@ -53,9 +69,38 @@ model_data <- function(spec, d) {
 #' structure of a specification. Interaction coefficients written `a:b` become
 #' formula terms `a_b`.
 #'
-#' @param spec A design specification (path or list).
+#' @details
+#' The three structures are the usual steps of a rule that simplifies a model when its fit is
+#' singular or fails to converge (Bates et al., 2015; Matuschek et al., 2017). Barr et al. (2013)
+#' recommend the maximal structure and suggest dropping its correlations when it fails to converge.
+#' `"maximal"` has every random slope the specification declares, correlated with the intercept
+#' where the specification correlates them, and uncorrelated (`||`) where it does not. `"zcp"`, the
+#' zero-correlation-parameter model, keeps those slopes and estimates no correlation among them,
+#' writing `||` for every grouping factor with a slope. Since [model_data()] supplies numeric
+#' contrast columns, `||` does remove the correlations, which it does not for a factor. A grouping
+#' factor without slopes keeps `(1 | g)`, since lme4 refuses `(1 || g)`. `"intercepts"` keeps a
+#' random intercept for each grouping factor and drops every slope. [power_mixed()] and
+#' [precision_design()] take these names as the rungs of such a rule.
+#'
+#' A specification with neither a fixed coefficient nor a random effect implies no model, and is
+#' refused with the same message as in the 'Python' package.
+#'
+#' @param spec A design specification (path or list). A path is read with [load_spec()], which
+#'   validates it.
+#' @param structure The random-effects structure: `"maximal"`, the default, `"zcp"` or
+#'   `"intercepts"` (see Details).
 #' @return A [stats::formula] object suitable for fitting with `lme4` or
 #'   `lmerTest`.
+#' @references Barr, D. J., Levy, R., Scheepers, C. and Tily, H. J. (2013). Random effects
+#'   structure for confirmatory hypothesis testing: Keep it maximal. \emph{Journal of Memory and
+#'   Language}, 68(3), 255-278. \doi{10.1016/j.jml.2012.11.001}
+#'
+#'   Bates, D., Kliegl, R., Vasishth, S. and Baayen, H. (2015). Parsimonious mixed models.
+#'   \emph{arXiv}. \doi{10.48550/arXiv.1506.04967}
+#'
+#'   Matuschek, H., Kliegl, R., Vasishth, S., Baayen, H. and Bates, D. (2017). Balancing
+#'   Type I error and power in linear mixed models. \emph{Journal of Memory and Language},
+#'   94, 305-315. \doi{10.1016/j.jml.2017.01.001}
 #' @examples
 #' spec <- build_spec(list(name = "d", seed = 1, design_kind = "within",
 #'   include_items = TRUE, n_subject = 10, n_item = 8, factor_name = "cond",
@@ -64,19 +109,33 @@ model_data <- function(spec, d) {
 #'   item_int_sd = 0.08, item_slope_sd = 0.02, item_corr = -0.1,
 #'   family = "shifted_lognormal", resp_name = "", sigma = 0.3, shift = 200))
 #' model_formula(spec)
+#' model_formula(spec, "zcp")
+#' model_formula(spec, "intercepts")
 #' @export
-model_formula <- function(spec) {
-  fixed <- vapply(names(spec$fixed$coefficients), .us, character(1))
+model_formula <- function(spec, structure = c("maximal", "zcp", "intercepts")) {
+  structure <- match.arg(structure)
+  if (is.character(spec)) spec <- load_spec(spec)
+  fixed <- vapply(names(spec[["fixed"]][["coefficients"]]), .us, character(1))
+  rs <- spec[["random"]]
   # `|` only when the process actually correlates the terms, `||` otherwise. Emitting `|`
   # unconditionally asked lmer to estimate a correlation that the specification had fixed at
   # zero, which spends degrees of freedom on a parameter known to be absent and makes a
   # boundary-singular fit the likely outcome. Since model_data() supplies numeric contrast
   # columns, with no factors among them, `||` does decorrelate here, without the partial-effect
-  # caveat that applies to `||` on a factor.
-  re <- vapply(names(spec$random), function(g)
-    sprintf("(%s %s %s)", paste(c("1", vapply(names(spec$random[[g]]$slopes), .us, character(1))),
-                                collapse = " + "), .re_bar(spec$random[[g]]), g),
-    character(1))
+  # caveat that applies to `||` on a factor. The two simpler structures drop the correlations, or
+  # the slopes as well, and a group left with its intercept alone takes `|` in each.
+  re <- vapply(names(rs), function(g) {
+    slopes <- if (structure == "intercepts") character(0)
+              else vapply(names(rs[[g]][["slopes"]]), .us, character(1))
+    bar <- if (structure == "maximal") .re_bar(rs[[g]])
+           else if (length(slopes)) "||" else "|"
+    sprintf("(%s %s %s)", paste(c("1", slopes), collapse = " + "), bar, g)
+  }, character(1))
+  # Without a term, the formula would read ".y ~ " and as.formula() stop on it with a parse error.
+  # The refusal is the Python twin's, word for word.
+  if (!length(c(fixed, re)))
+    stop("this specification has no fixed coefficients and no random effects, so it implies no ",
+         "model to fit", call. = FALSE)
   # Anchor the formula in the global environment, away from this function's evaluation
   # frame. print.formula omits its `<environment: ...>` line only for the global
   # environment, so any other choice trails a raw memory address that changes on every

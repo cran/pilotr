@@ -7,11 +7,13 @@
 load_spec(path, validate = TRUE)
 }
 \arguments{
-\item{path}{Path to a JSON design-specification file.}
+\item{path}{Path to a JSON design-specification file, or the JSON text itself, as the
+scripts from \code{\link[=generate_r_script]{generate_r_script()}} and \code{\link[=generate_design_analysis]{generate_design_analysis()}} embed it.}
 
 \item{validate}{Whether to validate the specification after reading it. \code{TRUE} (the default)
-applies \code{\link[=validate_spec]{validate_spec()}} with \code{strict = TRUE}; \code{FALSE} skips validation, and
-any other value is passed to \code{validate_spec()} as its \code{strict} argument.}
+applies \code{\link[=validate_spec]{validate_spec()}} with \code{strict = TRUE}, and \code{FALSE} skips validation. Any other value
+validates leniently, with \code{strict = FALSE}, so that an unknown field draws a warning, not an
+error.}
 }
 \value{
 The specification as a nested list, with sub-lists left unsimplified so that the
@@ -27,6 +29,11 @@ resolves to no column and so silently sets that effect to zero, and a response p
 left over from another family is ignored. Validation also refuses a specification declaring a
 \code{spec_version} newer than this implementation understands, and never reads such a file in
 part.
+
+The file is read as UTF-8, with or without a byte-order mark. A file that repeats a key
+within one JSON object is refused whatever \code{validate} says, because JSON leaves a repeated
+key undefined and the R and 'Python' readers settle it differently: one coefficient given
+twice was applied twice at its first value in R and once at its second in 'Python'.
 }
 \examples{
 spec <- build_spec(list(name = "demo", seed = 1, design_kind = "between",

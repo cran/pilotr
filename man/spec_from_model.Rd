@@ -11,7 +11,11 @@ spec_from_model(
   n_subject = NULL,
   n_item = NULL,
   family = NULL,
-  round = NULL
+  round = NULL,
+  effects = c("estimate", "safeguard"),
+  safeguard_level = 0.6,
+  sesoi = NULL,
+  counterbalance = TRUE
 )
 }
 \arguments{
@@ -24,8 +28,8 @@ what to pass instead.}
 \item{seed}{The master seed of the returned specification. Defaults to 1.}
 
 \item{n_subject}{Number of subjects for the returned specification. Defaults to the number of
-levels the fit actually had, and is normally raised above it, since scaling a pilot design
-up is the point of reading a specification off a pilot fit.}
+levels the fit had, and is normally raised above it, since a specification is read off a pilot
+fit to plan a larger study.}
 
 \item{n_item}{Number of items, treated the same way as \code{n_subject}. An error when the model
 has no second crossed grouping factor to act as items, because there is then no item unit to
@@ -39,39 +43,97 @@ family which a Gaussian fit cannot provide.}
 
 \item{round}{Decimal places for the simulated response, passed through to \code{response.round}.
 \code{NULL}, the default, leaves the response unrounded.}
+
+\item{effects}{Where the coefficients of the returned specification come from. \code{"estimate"},
+the default, takes the fit's point estimates. \code{"safeguard"} takes
+the bound of each coefficient's two-sided \code{safeguard_level} interval nearer zero, and stops
+with an error when that interval includes zero (see Details). Either way, a coefficient named
+in \code{sesoi} takes the value given there, and the intercept is the fit's.}
+
+\item{safeguard_level}{The confidence level of the intervals behind \code{effects = "safeguard"}, a
+single number greater than 0 and less than 1. The default of 0.6 follows Perugini, Gallucci
+and Costantini (2014).}
+
+\item{sesoi}{\code{NULL}, the default, or a named numeric vector that sets coefficients to a smallest
+effect size of interest on the scale of the fit, as in \code{sesoi = c(cond = 0.03)}. The names
+are the returned specification's coefficient keys, which write an interaction as \code{a:b}, and
+a name that is not among them is refused.}
+
+\item{counterbalance}{Whether a factor that the pilot counterbalanced sets \code{counterbalance} in
+the returned specification, which then declares specification version 0.4 (see Details).
+\code{TRUE}, the default, plans the pilot's design, unless its subjects each saw only some of the
+items or its model has a term named \code{list}. \code{FALSE} returns a fully crossed specification
+that releases reading version 0.3 accept, with a warning that the power computed from it is
+too high.}
 }
 \value{
-A design specification as a nested list, carrying \code{spec_version} and validated with
+A design specification as a nested list, carrying the lowest \code{spec_version} that reads
+it, 0.4 when it sets \code{counterbalance} and 0.3 otherwise, and validated with
 \code{\link[=validate_spec]{validate_spec()}}, so it can be passed directly to \code{\link[=simulate_design]{simulate_design()}},
 \code{\link[=power_mixed]{power_mixed()}} or \code{\link[=spec_json]{spec_json()}}. Two attributes record the readings that
 the fit did not settle on its own: \code{group_mapping}, a named character vector giving the
 specification unit each of the fit's grouping factors became, and \code{column_kinds}, a named
 character vector giving each model-frame column the classification \code{"factor"} or
-\code{"predictor"}. Both are attributes rather than fields so that the specification itself stays
-within the portable schema.
+\code{"predictor"}. A third, \code{effects}, is a list recording where the coefficients came from. Its
+\code{method} is the value of \code{effects}, its \code{level} the \code{safeguard_level} applied (\code{NA} with
+\code{"estimate"}) and its \code{sesoi} the keys of the coefficients set from \code{sesoi}. All three are
+attributes rather than fields so that the specification itself stays within the portable
+schema.
 }
 \description{
 Read a design specification off a linear mixed model already fitted with \code{lme4::lmer()} or
 \code{lmerTest::lmer()}. The fixed effects, the random-effect standard deviations and
 correlations, and the residual standard deviation are taken from the fit, and the numbers of
 subjects and items may be raised at the same time, so that a pilot study or a published model
-becomes the starting point of a power analysis, with no numbers left to invent.
+becomes the starting point of a power analysis. The fixed effects of a pilot are its point
+estimates, and a study powered for them tends to be underpowered. A message names them on
+every call, and \code{sesoi} or \code{effects = "safeguard"} replaces them (see Details).
 Requires the \code{lme4} package.
 }
 \details{
-Settling on plausible random-effect standard deviations with nothing to read them from is the
-step that most often stops a simulation-based power analysis before it starts, and the
-tutorials on the method converge on the same remedy, which is to take the variance components
-from a pilot fit or from a published model (Green and MacLeod, 2016; Kumle et al., 2021;
-DeBruine and Barr, 2021). This function performs that transfer, and the specification it
-returns can be enlarged and passed straight to \code{\link[=simulate_design]{simulate_design()}} or
-\code{\link[=power_mixed]{power_mixed()}}.
+Choosing plausible random-effect standard deviations with nothing to read them from is the step
+that most often stops a simulation-based power analysis before it starts. The tutorials on the
+method agree on the answer, which is to take the variance components from a pilot fit or from a
+published model (Green and MacLeod, 2016; Kumle et al., 2021; DeBruine and Barr, 2021). This
+function takes them from such a fit, and the specification it returns can be enlarged and passed
+straight to \code{\link[=simulate_design]{simulate_design()}} or \code{\link[=power_mixed]{power_mixed()}}.
+
+The fixed effects are another matter. They are the pilot's point estimates, which a small
+pilot measures imprecisely, and a pilot followed up because its effect looked promising has
+on average overestimated that effect. A study powered for such an estimate therefore tends to
+have less power than planned (Albers and Lakens, 2018). The variance components are the part
+of a pilot worth carrying over. The effect is better set to a smallest effect size of interest
+(SESOI), the smallest effect of theoretical or practical importance. For an effect keyed
+\code{cond}, as in the \code{crossed_mixed_rt} example, pass \code{sesoi = c(cond = 0.03)}, or set
+\code{spec$fixed$coefficients$cond <- 0.03} on the returned specification. Every call reports in a
+message which coefficients it took from the fit, with their values.
+
+When no SESOI can be argued for, \code{effects = "safeguard"} takes safeguard values (Perugini,
+Gallucci and Costantini, 2014). Each coefficient not named in \code{sesoi} becomes the bound of its
+two-sided \code{safeguard_level} interval nearer zero, by default that of the 60\% interval. The
+interval is the estimate plus or minus a quantile times the standard error from \code{vcov(fit)}.
+For an \code{lme4} fit, the quantile is normal, \code{qnorm((1 + safeguard_level) / 2)}, which is 0.84 at
+the default. The normal quantile treats the standard error as known, so the interval is too
+narrow when the subjects or items are few. For a \code{lmerTest} fit, the quantile is a t quantile
+on the Satterthwaite degrees of freedom that \code{lmerTest} reports, which allow for the
+uncertainty in the variance components, although only approximately. When \code{lmerTest} cannot
+give them for every coefficient, all coefficients take the normal quantile, and the message
+names the distribution used. An interval that includes zero stops the call with an error
+naming the effect. The pilot then leaves even the sign of the effect open, and a value of zero
+would plan a study of no effect at all. Such an effect needs a value in \code{sesoi}. By default,
+the conditions that \code{\link[=design_conditions]{design_conditions()}} builds for \code{\link[=sweep_spec]{sweep_spec()}} include one with every
+named effect at zero, which shows how often a design declares an effect that is not there.
+
+Whatever their source, the coefficients of the specification are the effects its data are
+simulated with. A named numeric \code{focal} in \code{\link[=power_mixed]{power_mixed()}} changes only the true values against
+which Type S and Type M are computed. The simulated effect stays as it was, so powering a study
+for another effect means changing the specification.
 
 Every number is taken on the scale the model was fitted on, and the returned family is
 Gaussian by default, because that is what a \code{lmer} fit is. A model of log reaction times
 therefore yields an intercept, coefficients and residual standard deviation on the log scale,
 which is the right thing for the \code{lognormal} and \code{shifted_lognormal} families, whose linear
-predictor lives on that scale as well. Ask for one of those with \code{family}, in the list form
+predictor is on that scale as well. Ask for one of those with \code{family}, in the list form
 when the family needs a parameter the fit cannot supply, as in
 \code{family = list(family = "shifted_lognormal", shift = 200)}.
 
@@ -84,16 +146,28 @@ distinct values is also treated as categorical, on the reasoning that a two-valu
 predictor in a factorial experiment is a coded factor far more often than it is a covariate.
 Any other numeric column becomes a continuous predictor, with \code{mean} and \code{sd} taken from the
 data, one value per unit for a unit-level variable so that an unbalanced design does not
-distort them. This is a heuristic and nothing more, it is reported by a message on every call,
-and a genuine two-valued covariate has to be moved from \code{factors} to \code{predictors} by hand.
+distort them. This is a heuristic, and a message reports it on every call. A genuine two-valued
+covariate has to be moved from \code{factors} to \code{predictors} by hand.
 
-A column is placed as \code{between} a unit when it holds one value within every member of that
-unit, and as \code{vary_within} when it takes several values inside every unit; the same test gives
-a continuous predictor its \code{varies_by}, which becomes \code{"observation"} when the predictor
-varies inside every unit. A model that codes one factor twice, once as a factor for its fixed
-effect and once as a numeric contrast for a random slope, gives two separate specification
-terms, because the two columns are separate columns in the model frame and nothing in the fit
-ties them together.
+A column is placed as \code{between} a unit when it holds one value within every member of that unit,
+and as \code{vary_within} when it takes several values inside every unit. The same test gives a
+continuous predictor its \code{varies_by}, which becomes \code{"observation"} when the predictor varies
+inside every unit. A model that codes one factor twice, once as a factor for its fixed effect and
+once as a numeric contrast for a random slope, gives two separate specification terms, because
+the two columns are separate columns in the model frame and nothing in the fit ties them
+together.
+
+Two or more factors placed between the same unit become one factor whose levels are their
+cells, and a message says so. The first-listed factor varies slowest, and each label joins the
+components' labels with \code{"."}. Two between factors over one unit need specification version
+0.4, which allocates them jointly. Up to version 0.3, each was assigned to blocks of its unit on
+its own, which confounded their effects, and \code{\link[=validate_spec]{validate_spec()}} refuses them in a specification
+declaring an earlier version. The factor of cells allocates the units as version 0.4 allocates
+the separate factors, and every release that reads version 0.3 reads it, so the returned
+specification declares 0.3. The combined factor carries every component's contrast columns
+under the names the fit gave them, so each coefficient the fit estimated, interactions
+included, still names a column. Every cell then receives units, in equal numbers whenever the
+number of units is a multiple of the number of cells.
 
 Interactions need one further step. lme4 writes the interaction of two model-frame columns as
 \code{a:b}, which is already the specification's convention, but \code{\link[=model_data]{model_data()}} gives an
@@ -104,7 +178,7 @@ column called \code{z_freq} for an interaction and settles where to
 split a name with several underscores. A recognised product column is reported and re-keyed to
 \code{a:b}, and it contributes no factor or predictor of its own.
 
-Grouping factors named \code{subject} and \code{item} are used as they stand. Otherwise the one with the
+Grouping factors named \code{subject} and \code{item} are used as they stand. Otherwise, the one with the
 most levels becomes \code{subject}, the largest remaining factor that is crossed with it becomes
 \code{item}, and every other grouping factor becomes an extra \code{random} entry with the \code{over} and
 \code{n} fields that pilotr's additional grouping factors take, \code{over} being decided by which unit
@@ -113,13 +187,60 @@ the factor partitions. Any renaming is reported by a message and recorded in the
 item unit gains a \code{per_subject} count, so that the recovered design keeps the partial crossing
 of the original.
 
-A boundary-singular pilot fit is carried across as it stands, which means a variance estimated
-at zero or a correlation estimated at exactly plus or minus one. Those are faithful readings
-of the fit, and no kind of defect, but they are also the sign that the random-effect
-structure was richer than the pilot could support, and a power analysis resting on them will
-inherit that
-(Bates et al., 2015). Widening the design, or simplifying the structure before refitting, is
-the remedy.
+A factor that varies within both units is crossed with every subject-item pair unless it sets
+\code{counterbalance}, a field of specification version 0.4. A pilot run in counterbalanced lists,
+as priming studies usually are, showed each subject each item at one level only. The levels
+rotated across lists of subjects, so that every item appeared at each level. When every
+subject-item pair of the pilot holds one level of a factor, and every subject and every item
+holds two or more, the returned specification sets \code{counterbalance} to \code{TRUE} on that factor
+and declares version 0.4. Each subject then meets each item at one level, the levels rotating
+over subjects and items as described under Counterbalanced lists in the specification
+(\code{spec/SPEC.md}). The simulated data name each subject's list in a column \code{list}. Factors
+rotated together, as two two-level factors over four lists, are all counterbalanced, and a
+message names them. Releases that read no version above 0.3 refuse such a specification.
+
+\code{counterbalance = FALSE} returns the crossed specification instead, with a warning, and releases
+that read no version above 0.3 accept it. It has twice the pilot's observations per subject for a
+two-level factor, three times for a three-level one and four times for two two-level factors
+rotated together. The power computed from it is therefore too high. Take the variance
+components of the \code{crossed_mixed_rt} example, with 30 subjects, 24 items and an effect of 0.05
+on the log scale. By the formulas of Judd, Westfall and Kenny (2017), power is then about 0.80
+for the crossed design and 0.55 for the counterbalanced one. The counterbalanced study needs
+about 1.8 times the subjects to match the crossed one. A release that reads no version above 0.3
+takes a two-level design written with a list factor between subjects and an item-set factor
+between items, as in the two-list example among the worked encodings of the specification.
+The crossed specification and the warning also come back, whatever \code{counterbalance} says, when
+each subject of the pilot saw only some of the items. The specification then keeps
+\code{per_subject}, which version 0.4 does not combine with \code{counterbalance}, since that field needs
+every subject to see every item. They come back as well when the pilot's model has a column or
+grouping factor named \code{list}, as a model that fits the list beside the condition does. Version
+0.4 gives that name to the column holding each subject's list, and no other column may share
+it. The warning then asks for the term to be renamed in the pilot's data and the model refitted.
+
+Alternatively, keep the crossed specification and drop the rows that a counterbalanced study
+would not observe, through the \code{prep} argument of \code{\link[=power_mixed]{power_mixed()}} and \code{\link[=precision_design]{precision_design()}}.
+That function receives each simulated data set and returns the modelling data, so it ends by
+calling \code{\link[=model_data]{model_data()}}. With \code{workers > 1}, it runs in worker processes that have not attached
+pilotr and cannot see the caller's variables, so it has to call \code{pilotr::model_data()} and
+carry the specification with it. A function made by another function carries it once that
+function has forced its argument, as in this rotation over two lists for the
+\code{crossed_mixed_rt} example, whose factor is \code{condition}:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{counterbalance <- function(spec) \{
+  force(spec)
+  function(d) \{
+    level <- match(d$condition, spec$factors[[1]]$levels) - 1L
+    pilotr::model_data(spec, d[(d$subject \%\% 2L + d$item + level) \%\% 2L == 0L, ])
+  \}
+\}
+power_mixed(spec, prep = counterbalance(spec), workers = 4)
+}\if{html}{\out{</div>}}
+
+A boundary-singular pilot fit is carried across as it stands, with a variance estimated at zero
+or a correlation estimated at exactly plus or minus one. Those values read the fit faithfully.
+They also show that the random-effect structure was richer than the pilot could support, and a
+power analysis built on them inherits that (Bates et al., 2015). To avoid it, enlarge the pilot
+design, or simplify the structure before refitting.
 }
 \examples{
 \donttest{
@@ -138,10 +259,19 @@ if (requireNamespace("lme4", quietly = TRUE)) {
   spec$random$subject$intercept_sd
   attr(spec, "column_kinds")
   head(simulate_design(spec))
+
+  # The effect is the pilot's estimate. Plan for a smallest effect size of interest, here 0.03
+  # on the log scale, or for the bound of the estimate's 60\% interval nearer zero.
+  spec_from_model(fit, n_subject = 60, n_item = 40, sesoi = c(effect = 0.03))$fixed
+  spec_from_model(fit, n_subject = 60, n_item = 40, effects = "safeguard")$fixed
 }
 }
 }
 \references{
+Albers, C. and Lakens, D. (2018). When power analyses based on pilot data are
+biased: Inaccurate effect size estimators and follow-up bias. \emph{Journal of Experimental
+Social Psychology}, 74, 187-195. \doi{10.1016/j.jesp.2017.09.004}
+
 Bates, D., Kliegl, R., Vasishth, S. and Baayen, H. (2015). Parsimonious mixed
 models. \emph{arXiv}. \doi{10.48550/arXiv.1506.04967}
 
@@ -149,16 +279,24 @@ DeBruine, L. M. and Barr, D. J. (2021). Understanding mixed-effects models throu
 simulation. \emph{Advances in Methods and Practices in Psychological Science}, 4(1).
 \doi{10.1177/2515245920965119}
 
-Green, P. and MacLeod, C. J. (2016). SIMR: an R package for power analysis of generalized
+Green, P. and MacLeod, C. J. (2016). SIMR: An R package for power analysis of generalized
 linear mixed models by simulation. \emph{Methods in Ecology and Evolution}, 7(4), 493-498.
 \doi{10.1111/2041-210X.12504}
 
-Kumle, L., Vo, M. L.-H. and Draschkow, D. (2021). Estimating power in (generalized) linear
-mixed models: An open introduction and tutorial in R. \emph{Behavior Research Methods}, 53,
-2528-2543. \doi{10.3758/s13428-021-01546-0}
+Judd, C. M., Westfall, J. and Kenny, D. A. (2017). Experiments with more than one random
+factor: Designs, analytic models, and statistical power. \emph{Annual Review of Psychology},
+68, 601-625. \doi{10.1146/annurev-psych-122414-033702}
+
+Kumle, L., \enc{Võ}{Vo}, M. L.-H. and Draschkow, D. (2021). Estimating power in (generalized)
+linear mixed models: An open introduction and tutorial in R. \emph{Behavior Research
+Methods}, 53(6), 2528-2543. \doi{10.3758/s13428-021-01546-0}
+
+Perugini, M., Gallucci, M. and Costantini, G. (2014). Safeguard power as a protection against
+imprecise power estimates. \emph{Perspectives on Psychological Science}, 9(3), 319-332.
+\doi{10.1177/1745691614528519}
 }
 \seealso{
 \code{\link[=simulate_design]{simulate_design()}} to simulate from the recovered specification,
-\code{\link[=power_mixed]{power_mixed()}} to run the power analysis it was read off the fit for, and
+\code{\link[=power_mixed]{power_mixed()}} to run the power analysis it was read off the fit for and
 \code{\link[=model_formula]{model_formula()}} for the analysis model a specification implies.
 }

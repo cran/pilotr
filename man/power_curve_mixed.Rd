@@ -10,7 +10,9 @@ power_curve_mixed(
   focal = NULL,
   n_sims = 60,
   alpha = 0.05,
-  workers = 1
+  workers = 1,
+  seeds = c("independent", "shared"),
+  alternative = c("two.sided", "greater", "less")
 )
 }
 \arguments{
@@ -18,38 +20,53 @@ power_curve_mixed(
 
 \item{subject_ns}{A numeric vector of subject counts to evaluate.}
 
-\item{focal}{The fixed effects to test, as in \code{\link[=power_mixed]{power_mixed()}}.}
+\item{focal}{The fixed effects to test, or the named sets of coefficients to test jointly, as
+in \code{\link[=power_mixed]{power_mixed()}}.}
 
-\item{n_sims}{Number of Monte Carlo replicates per point. A power estimate carries a Monte
-Carlo standard error of about \code{sqrt(p * (1 - p) / n_sims)}, reported alongside it as
-\code{power_mcse}. The default of 60 gives a standard error of 0.065 at a power of 0.5, which is
-too coarse to support a claim about a design; raise it to at least 200 for planning.}
+\item{n_sims}{Number of Monte Carlo replicates per point. A power estimate carries a Monte Carlo
+standard error of about \code{sqrt(p * (1 - p) / n_sims)}, reported alongside it as \code{power_mcse}.
+The default of 60 gives a standard error of 0.065 at a power of 0.5, which is too coarse to
+support a claim about a design. Raise it to at least 200 for planning.}
 
-\item{alpha}{Two-sided significance level.}
+\item{alpha}{Significance level of the test, two-sided unless \code{alternative} says otherwise.}
 
 \item{workers}{Number of local worker processes over which to spread the replicates at
 each grid point. The default of 1 runs serially, and any worker count returns results
-identical to a serial run.}
+identical to a serial run. One pool of that many processes serves the whole sweep.}
+
+\item{seeds}{How the sample sizes are seeded: \code{"independent"}, the default, or \code{"shared"}, as
+in \code{\link[=sweep_spec]{sweep_spec()}}'s \code{.seeds}.}
+
+\item{alternative}{The alternative hypothesis of every test, \code{"two.sided"}, \code{"greater"} or
+\code{"less"}, as in \code{\link[=power_mixed]{power_mixed()}}.}
 }
 \value{
 A data frame with one row per sample size and focal effect, with columns \code{n_subject},
 \code{effect}, \code{true}, \code{power}, \code{power_mcse}, \code{power_lo}, \code{power_hi}, \code{n_significant}, \code{type_s},
-\code{type_m}, and the \code{n_attempted}, \code{n_returned}, \code{n_converged}, \code{n_singular} and \code{n_warning} fit
-counts. \code{n_singular} typically falls as the sample size rises, so reading it down the sweep
-shows where the model becomes supportable.
+\code{type_s_lo}, \code{type_s_hi}, \code{type_m}, \code{type_m_mcse}, the \code{n_attempted}, \code{n_returned},
+\code{n_converged}, \code{n_singular} and \code{n_warning} fit counts, and \code{fitter}, as in \code{\link[=power_mixed]{power_mixed()}}.
+\code{fitter} names the direction of a one-sided test.
+With sets of coefficients in \code{focal}, \code{effect} holds each set's name, a column \code{coefficients}
+after it lists the set's coefficients, and \code{fitter} names the joint test.
+\code{n_singular} typically falls as the sample size rises, so reading it down the sweep shows
+where the model becomes supportable.
 }
 \description{
 Sweep the number of subjects and compute mixed-effects power at each. Pass the result to
-\code{\link[=target_n]{target_n()}} for the sample size at which power crosses a target, with an interval on it. A
-thin wrapper around \code{\link[=sweep_spec]{sweep_spec()}} over \code{units$subject$n}, kept because a sample-size curve is
-the sweep users want most often. Requires the \code{lme4} and \code{lmerTest} packages.
+\code{\link[=target_n]{target_n()}} for the sample size at which power crosses a target, with an interval on it. It
+calls \code{\link[=sweep_spec]{sweep_spec()}} over \code{units$subject$n}. Requires the \code{lme4} and \code{lmerTest} packages.
 }
 \details{
 Like \code{\link[=power_mixed]{power_mixed()}}, this runs pilotr's own simulation loop over the portable design
-specification rather than wrapping an existing package, and differs from \code{simr} (Green and
-MacLeod, 2016) and \code{mixedpower} (Kumle, Vo and Draschkow, 2021) in being driven by that
-specification, in reporting Type S and Type M errors, and in built-in parallelisation: with
-\code{workers > 1} a single worker pool is created once and reused across all sample sizes.
+specification. It differs from \code{simr} (Green and MacLeod, 2016) and \code{mixedpower} (Kumle,
+\enc{Võ}{Vo} and Draschkow, 2021) in the same two ways: the specification drives it and it
+reports Type S and Type M errors. With \code{workers > 1}, one worker pool is created once and reused
+across all sample sizes.
+
+Each sample size draws its own replicates, from the seed \code{\link[=sweep_spec]{sweep_spec()}} gives its grid point,
+so the points of the curve are independent, as \code{\link[=target_n]{target_n()}} assumes when it fits them.
+\code{seeds = "shared"} runs every point from the specification's own seed instead, and the points
+then share their noise (see \code{\link[=sweep_spec]{sweep_spec()}}).
 
 For any axis other than sample size, call \code{\link[=sweep_spec]{sweep_spec()}} directly. Effect size is the axis a
 design analysis most often needs after sample size, and \code{\link[=design_conditions]{design_conditions()}} builds the
@@ -58,6 +75,22 @@ coefficient overrides for it.
 The curve is the input to \code{\link[=target_n]{target_n()}}, which is where the sample size a preregistration
 quotes should come from. Reading the crossing off a plot instead judges points whose Monte
 Carlo intervals overlap, and reports the answer without the interval that goes with it.
+
+In a crossed design, the number of items limits how far adding subjects can raise power. When the
+effect of a condition varies from item to item, as a by-item random slope says it does, part of
+the
+standard error of the effect comes from the items sampled. That part shrinks only as items are
+added. As subjects are added, the standard error therefore falls towards a floor set by the
+number of items. Power at a fixed number of items levels off below 1 (Westfall, Kenny and Judd,
+2014; Judd, Westfall and Kenny, 2017). The probit curve that \code{\link[=target_n]{target_n()}} fits rises towards 1
+and cannot bend into such a plateau. A curve that levels off near the target can then be solved far
+from the true crossing. One that levels off just below the target never crosses it, but Monte
+Carlo noise can lift a simulated power over the target, and the curve can then be solved as
+though it crossed. To compare designs that trade subjects for items, sweep \code{units$item$n} with
+\code{\link[=sweep_spec]{sweep_spec()}} at each of a few subject counts and solve each curve for the number of items, as
+the power vignette shows. Power over items levels off in the same way, at a ceiling set by the
+by-subject slope and the number of subjects. The subject counts must be large enough to put that
+ceiling well above the target.
 }
 \examples{
 \donttest{
@@ -79,11 +112,19 @@ Green, P. and MacLeod, C. J. (2016). SIMR: An R package for power analysis
 of generalized linear mixed models by simulation. \emph{Methods in Ecology and
 Evolution}, 7(4), 493-498. \doi{10.1111/2041-210x.12504}
 
-Kumle, L., Vo, M. L.-H. and Draschkow, D. (2021). Estimating power in (generalized)
+Judd, C. M., Westfall, J. and Kenny, D. A. (2017). Experiments with more than one random
+factor: Designs, analytic models, and statistical power. \emph{Annual Review of Psychology},
+68, 601-625. \doi{10.1146/annurev-psych-122414-033702}
+
+Kumle, L., \enc{Võ}{Vo}, M. L.-H. and Draschkow, D. (2021). Estimating power in (generalized)
 linear mixed models: An open introduction and tutorial in R. \emph{Behavior Research
-Methods}, 53, 2528-2543. \doi{10.3758/s13428-021-01546-0}
+Methods}, 53(6), 2528-2543. \doi{10.3758/s13428-021-01546-0}
+
+Westfall, J., Kenny, D. A. and Judd, C. M. (2014). Statistical power and optimal design in
+experiments in which samples of participants respond to samples of stimuli. \emph{Journal of
+Experimental Psychology: General}, 143(5), 2020-2045. \doi{10.1037/xge0000014}
 }
 \seealso{
 \code{\link[=target_n]{target_n()}} to solve the returned curve for a sample size, \code{\link[=sweep_spec]{sweep_spec()}} for any
-other axis, and \code{\link[=design_conditions]{design_conditions()}} for effect-size grids.
+other axis and \code{\link[=design_conditions]{design_conditions()}} for effect-size grids.
 }

@@ -75,6 +75,34 @@ test_that("generation is silent and embeds the bridge's model", {
   for (p in b$priors) expect_true(grepl(p, script, fixed = TRUE))
 })
 
+# brms calls reading_time_continuous's "cond:age" coefficient "age:cond", because age comes
+# first in the formula, so the script's draws hold `b_age:cond` and no `b_cond:age`. A focal
+# interaction is accepted with its parts in either order and reaches the script as brms names it.
+test_that("a focal interaction reaches the script under the name brms gives it", {
+  spec <- load_spec(pilotr_example("reading_time_continuous"))
+  # A tenth of the subjects and a fifth of the items, which leaves every name as it is and keeps
+  # the two emissions quick.
+  spec[["units"]][["subject"]][["n"]] <- 5L
+  spec[["units"]][["item"]][["n"]] <- 8L
+  for (written in c("cond:age", "age:cond")) {
+    expect_silent(s <- generate_design_analysis(spec, focal = stats::setNames(0.02, written)))
+    expect_true(grepl('focal      <- "age:cond"', s, fixed = TRUE), info = written)
+    expect_true(grepl("focal_true <- c(`age:cond` = 0.02)", s, fixed = TRUE), info = written)
+    expect_true(grepl('coef = "age:cond"', s, fixed = TRUE), info = written)
+  }
+  # Both orders name one coefficient, so asking for both asks for it twice.
+  expect_error(generate_design_analysis(spec, focal = c("cond:age", "age:cond")),
+               "duplicated focal effect")
+})
+
+test_that("a design without random effects emits no prior on random-effect SDs", {
+  spec <- load_spec(pilotr_example("between_2group_gaussian"))
+  s <- generate_design_analysis(spec, focal = c(grp = 5))
+  expect_false(grepl('class = "sd"', s, fixed = TRUE))
+  expect_false(grepl('class = "Intercept"', s, fixed = TRUE))
+  expect_true(grepl('prior(normal(0, 10.23), class = "b", coef = "grp")', s, fixed = TRUE))
+})
+
 # The verdict is a pure function of the rule, the gate and the specification, so a record that
 # carries only the verdict cannot be told apart from one produced under a different ROPE.
 test_that("the emitted record carries the rule, the gate, the spec and the version", {
@@ -86,6 +114,35 @@ test_that("the emitted record carries the rule, the gate, the spec and the versi
     expect_true(grepl(col, script, fixed = TRUE))
   # The fingerprint is computed from the embedded specification, not pasted in as a literal.
   expect_true(grepl("tools::md5sum", script, fixed = TRUE))
+})
+
+# A true value taken from a fitted pilot, or a threshold computed from others, can need
+# seventeen significant digits, or sixteen whose digits exceed 2^53. On a build without long
+# doubles, R's parser reads such a decimal one unit in the last place away, as it read these two.
+test_that("the design-analysis script carries every number exactly", {
+  spec <- load_spec(pilotr_example("crossed_mixed_rt"))
+  spec$fixed$coefficients$cond <- 0.09470803828730423
+  script <- generate_design_analysis(spec, focal = c(cond = 0.9923772805192401),
+                                     rule = list(rope = 0.1 + 0.2))
+  for (tok in r_decimal_tokens(script))
+    expect_identical(no_long_double(tok), as.numeric(tok), info = tok)
+  # A threshold typed as a short decimal stays one.
+  expect_true(grepl("ci_mass       <- 0.95\n", script, fixed = TRUE))
+
+  # The assignments that carry numbers need neither brms nor a sampler to evaluate.
+  wanted <- c("spec", "bf_threshold", "rope", "ci_mass", "max_rhat", "max_divergent",
+              "focal_true")
+  env <- new.env(parent = asNamespace("pilotr"))
+  for (e in parse(text = script, keep.source = FALSE))
+    if (is.call(e) && identical(e[[1]], as.name("<-")) && is.name(e[[2]]) &&
+        as.character(e[[2]]) %in% wanted) eval(e, env)
+  expect_identical(env$spec$fixed$coefficients$cond, 0.09470803828730423)
+  # The run's fingerprint is taken from spec_json() of the embedded specification, so reading
+  # the specification back must leave that text as it was.
+  expect_identical(spec_json(env$spec), spec_json(spec))
+  expect_identical(env$focal_true, c(cond = 0.9923772805192401))
+  expect_identical(c(env$bf_threshold, env$rope, env$ci_mass, env$max_rhat, env$max_divergent),
+                   c(10, 0.1 + 0.2, 0.95, 1.01, 0.01))
 })
 
 test_that("the aggregator combines one run and refuses to pool two", {

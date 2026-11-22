@@ -8,5 +8,6 @@ options(cli.num_colors = 1, cli.hyperlink = FALSE, crayon.enabled = FALSE,
         width = 80)
 
 ## -----------------------------------------------------------------------------
+# install.packages(c("shiny", "ggplot2"))
 # pilotr::run_app()
 

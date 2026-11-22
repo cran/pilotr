@@ -9,7 +9,7 @@
 \arguments{
 \item{x}{A \code{pilotr_power} object, as returned by \code{\link[=power_mixed]{power_mixed()}}.}
 
-\item{digits}{Number of significant digits for the reported rates.}
+\item{digits}{Number of decimal places for the reported rates and for the interval bounds.}
 
 \item{...}{Ignored, present for consistency with the generic.}
 }
@@ -17,7 +17,15 @@
 \code{x}, invisibly.
 }
 \description{
-Shows the fit accounting and then one row per focal effect, with each power estimate beside its
-Monte Carlo standard error and Wilson interval, so that the precision of the estimate is as
-visible as the estimate.
+Shows the fit accounting, with the share of the replicates analysed at each rung when the result
+comes from a ladder, and then two tables with one row per focal effect. The first gives
+each power estimate beside its Monte Carlo standard error and Wilson interval, so that the
+precision of the estimate is as visible as the estimate. The second gives Type S beside its
+Wilson interval and Type M beside its Monte Carlo standard error, both taken over the
+significant replicates alone.
+}
+\details{
+A result whose \code{focal} named sets of coefficients lists the coefficients of each set before the
+first table, which has one row per set and no true value. It has no second table, since a joint
+test has no single estimate from which Type S or Type M could be taken.
 }

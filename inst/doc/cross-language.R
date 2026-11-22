@@ -17,7 +17,7 @@ spec <- build_spec(list(
   intercept = 100, effect = 5, family = "gaussian",
   resp_name = "score", sigma = 10))
 
-isTRUE(all.equal(simulate_design(spec), simulate_design(spec)))
+identical(simulate_design(spec), simulate_design(spec))
 
 ## -----------------------------------------------------------------------------
 spec2 <- spec; spec2$seed <- spec$seed + 1L

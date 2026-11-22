@@ -1,23 +1,136 @@
 # Shared mixed-model fitting for the replicate loops, with honest convergence accounting.
 #
-# The replicate loops previously wrapped each fit in suppressWarnings(), so only a hard error
-# was ever visible: a boundary-singular fit and a fit whose optimiser reported non-convergence
-# both counted as converged. That made `n_converged` close to meaningless for the design class
-# pilotr is aimed at, because a maximal crossed random-effects structure is singular in a large
-# share of replicates at realistic sample sizes (Bates et al., 2015; Matuschek et al., 2017).
+# Each fit's warnings are recorded rather than suppressed. Under suppressWarnings(), only a hard
+# error would be visible, and a boundary-singular fit and a fit whose optimiser reported
+# non-convergence would both count as converged. That would make `n_converged` close to
+# meaningless for the design class pilotr is aimed at, because a maximal crossed random-effects
+# structure is singular in a large share of replicates at realistic sample sizes (Bates et al.,
+# 2015; Matuschek et al., 2017).
 #
-# Singular and warning fits still count towards the result. Their fixed-effect estimates
+# Singular and warning fits count towards the result. Their fixed-effect estimates
 # stay interpretable, and dropping them would bias the result, since singularity is not
 # independent of the variance estimates that produce it: excluding those replicates would
 # preferentially remove the ones with small estimated random-effect variance, and so overstate
 # precision. They are counted and reported instead, which tells the user something actionable,
 # namely that the model being fitted is richer than the data can support.
 
-# Fit one mixed model and record what the fitter actually reported. Returns the fit (NULL if it
-# failed outright), whether it is boundary-singular, any warning or convergence messages, and a
-# strict `converged` flag that is TRUE only when there were neither.
-.fit_lmer <- function(formula, data, test = FALSE) {
+# The fitter follows the response family. A bernoulli or poisson specification writes its
+# coefficients on the logit or log scale, while a linear model of the 0/1 or count response
+# estimates a difference on the response scale. Compared with the true value, that difference puts
+# Type M at 0.21 on a crossed accuracy design that a logistic model shows exaggerating, at 1.12,
+# and sets ROPE intervals on one scale against a region on another, although power hardly differs,
+# since the two tests agree on the sign and nearly always on significance. glmer() therefore fits
+# those two families on their own link scale, with a Wald z test. A model with no random terms,
+# such as that of every shipped between-subjects example, is fitted by lm() or glm(), since lmer()
+# stops with "No random effects terms specified in formula".
+#
+# Ordinal and beta responses have no frequentist model here yet, since a proportional-odds or
+# Beta mixed model would need a package beyond lme4. They are fitted by the linear fallback on
+# the response scale. The callers withhold the quantities that compare that scale with the
+# specification's link scale, and raise the warnings below.
+
+# The families whose coefficients are on a link scale, with the scale's name.
+.LINK_SCALE <- c(bernoulli = "logit", poisson = "log", ordinal = "logit", beta = "logit")
+
+# The two of those that lme4 and stats fit on that scale, with the family object's name.
+.GLM_FAMILY <- c(bernoulli = "binomial", poisson = "poisson")
+
+# The warnings for a family fitted by the linear fallback. power_mixed() in the Python twin raises
+# the first word for word, for every family in .LINK_SCALE, since it has no other model.
+.LINEAR_POWER <- paste0(
+  "power_mixed() fits a linear model to the %s response on its own scale, while the ",
+  "specification's coefficients are on the %s scale, so the mean estimate and Type M are ",
+  "withheld (NA) and Type S compares signs only. For a model on the link scale, use ",
+  "generate_design_analysis() or brms_bridge() in the R package.")
+.LINEAR_PRECISION <- paste0(
+  "precision_design() fits a linear model to the %s response on its own scale, while the ",
+  "region of practical equivalence and the specification's coefficients are on the %s scale, ",
+  "so the decision probabilities are withheld (NA). For a decision on the link scale, use ",
+  "generate_design_analysis() in the R package.")
+
+# Whether a model formula has a random-effects term, a `|` or `||` call anywhere on its right-hand
+# side, which is where lme4 looks for one. lme4::findbars() answers the same question, but from
+# lme4 1.1-38 it is a shim for reformulas::findbars() that warns when it is called through lme4.
+# The fitter needs to know only whether there is such a term. lmer() also takes a formula written
+# as text, which is read as a formula first. Taken as it came, the text showed no such term, and
+# lm() then fitted the model without its random effects.
+.has_bars <- function(formula) {
+  formula <- stats::as.formula(formula)
+  walk <- function(x) is.call(x) &&
+    (identical(x[[1L]], as.name("|")) || identical(x[[1L]], as.name("||")) ||
+       any(vapply(as.list(x)[-1L], walk, logical(1))))
+  walk(formula[[length(formula)]])
+}
+
+# Which model a fit takes: the GLM family name (NULL for a linear model) and whether the formula
+# has random terms. The family chooses only for the model pilotr derives (`auto`). A formula the
+# user writes is fitted as a linear model, since only its author knows the scale its response is
+# on.
+.model_kind <- function(formula, family, auto) {
+  glm_family <- if (isTRUE(auto) && family %in% names(.GLM_FAMILY)) .GLM_FAMILY[[family]]
+  list(glm_family = glm_family, has_re = .has_bars(formula))
+}
+
+# Whether a call fits the linear fallback to a response whose coefficients are on a link scale,
+# which is when the scale-dependent quantities are withheld.
+.linear_on_link <- function(family, auto) {
+  isTRUE(auto) && family %in% setdiff(names(.LINK_SCALE), names(.GLM_FAMILY))
+}
+
+# The fitter and the test behind a run's estimates, as the result reports them, for example
+# "lme4::glmer (binomial), Wald z". With `test = FALSE`, the only inference made is the interval
+# precision_design() builds, the estimate plus or minus 1.96 standard errors, a Wald z interval.
+# A one-sided test is named with its direction, "stats::lm, t, one-sided (greater)", so that a
+# result read later says which test its power belongs to. A joint test of a set of coefficients
+# (see .joint_test()) is named by its own statistic, the F or the chi-square of which each
+# single-coefficient test is the one-degree-of-freedom case.
+.fitter_label <- function(formula, family, test, auto, alternative = "two.sided", joint = FALSE) {
+  k <- .model_kind(formula, family, auto)
+  fitter <- if (!is.null(k$glm_family))
+    sprintf("%s (%s)", if (k$has_re) "lme4::glmer" else "stats::glm", k$glm_family)
+  else if (k$has_re) { if (test) "lmerTest::lmer" else "lme4::lmer" }
+  else "stats::lm"
+  inference <- if (!test || !is.null(k$glm_family)) "Wald z"
+    else if (k$has_re) "Satterthwaite t" else "t"
+  if (test && joint)
+    inference <- c("Wald z" = "Wald chi-square", "Satterthwaite t" = "Satterthwaite F",
+                   t = "F")[[inference]]
+  if (test && alternative != "two.sided")
+    inference <- sprintf("%s, one-sided (%s)", inference, alternative)
+  paste(fitter, inference, sep = ", ")
+}
+
+# The one-sided p-value of the coefficient `fn`, from the statistic behind its two-sided p-value in
+# the coefficient table `co`, whose p-value column is `pcol`. The upper tail tests "greater" and
+# the lower tail "less". A z is referred to the normal distribution. A t is referred to the t
+# distribution with the degrees of freedom of its two-sided test. For lmerTest those are
+# Satterthwaite's, which the table holds in its `df` column, and for lm() they are the residual
+# degrees of freedom. Each two-sided p-value is twice the tail beyond |statistic|, computed by the
+# same function, so the one-sided p-value is exactly half of it when the statistic lies in the
+# tested direction.
+.one_sided_p <- function(co, fn, pcol, fit, alternative) {
+  lower <- alternative == "less"
+  if (identical(pcol, "Pr(>|z|)")) return(stats::pnorm(co[fn, "z value"], lower.tail = lower))
+  df <- if ("df" %in% colnames(co)) co[fn, "df"] else stats::df.residual(fit)
+  stats::pt(co[fn, "t value"], df, lower.tail = lower)
+}
+
+# Fit one replicate's model and record what the fitter reported. Returns the fit (NULL if it
+# failed outright), whether it is boundary-singular, any warning or convergence messages other than
+# the singular-fit notice, and a strict `converged` flag that is TRUE only when there were neither.
+# `family` is the specification's response family, and `auto` says whether pilotr derived the
+# formula. Together, they choose the fitter, as .model_kind() describes.
+.fit_model <- function(formula, data, family = "gaussian", test = FALSE, auto = TRUE) {
+  k <- .model_kind(formula, family, auto)
+  fam <- if (!is.null(k$glm_family)) switch(k$glm_family, binomial = stats::binomial(),
+                                            poisson = stats::poisson())
   msgs <- character(0)
+  # By default lme4 stores its boundary (singular) fit notice with the optimiser's messages, which
+  # are read below. Every singular fit was then also counted as a fit with warnings, and n_warning
+  # could never differ from n_singular. The check is switched off here, and singularity is taken
+  # from isSingular(), whose default tolerance matches this one. Filtering the notice by its text
+  # would break whenever lme4 rewords it, as it did in 1.1-21. glmer() takes the same settings.
+  singular_cc <- lme4::.makeCC(action = "ignore", tol = 1e-4)
   # The fitter's own error message is kept and passed on. A model that lme4 refuses
   # outright, most often because the random-effects structure is unidentifiable at that sample
   # size, otherwise produced a result of NA with nothing to explain it, which leaves the user with
@@ -25,12 +138,22 @@
   fit <- withCallingHandlers(
     tryCatch(
       suppressMessages(
-        if (test)
+        if (k$has_re && !is.null(fam))
+          lme4::glmer(formula, data = data, family = fam,
+                      control = lme4::glmerControl(calc.derivs = FALSE,
+                                                   check.conv.singular = singular_cc))
+        else if (k$has_re && test)
           lmerTest::lmer(formula, data = data,
-                         control = lme4::lmerControl(calc.derivs = FALSE))
-        else
+                         control = lme4::lmerControl(calc.derivs = FALSE,
+                                                     check.conv.singular = singular_cc))
+        else if (k$has_re)
           lme4::lmer(formula, data = data,
-                     control = lme4::lmerControl(calc.derivs = FALSE))),
+                     control = lme4::lmerControl(calc.derivs = FALSE,
+                                                 check.conv.singular = singular_cc))
+        else if (!is.null(fam))
+          stats::glm(formula, data = data, family = fam)
+        else
+          stats::lm(formula, data = data)),
       error = function(e) { msgs <<- c(msgs, conditionMessage(e)); NULL }),
     warning = function(w) {
       msgs <<- c(msgs, conditionMessage(w))
@@ -38,13 +161,27 @@
     })
   if (is.null(fit))
     return(list(fit = NULL, singular = FALSE, messages = msgs, converged = FALSE))
-  # The optimiser records its own convergence messages separately from the R warning
-  # condition, so both have to be consulted.
-  opt_msgs <- tryCatch(fit@optinfo$conv$lme4$messages, error = function(e) NULL)
-  singular <- isTRUE(tryCatch(lme4::isSingular(fit), error = function(e) FALSE))
+  if (inherits(fit, "merMod")) {
+    # The optimiser records its own convergence messages separately from the R warning
+    # condition, so both have to be consulted.
+    opt_msgs <- tryCatch(fit@optinfo$conv$lme4$messages, error = function(e) NULL)
+    singular <- isTRUE(tryCatch(lme4::isSingular(fit), error = function(e) FALSE))
+  } else {
+    # lm() and glm() estimate no variance component, so neither fit can be singular. glm() also
+    # records in the fit whether its iterations converged, beside the warning it raises. The
+    # message below is glm.fit's own, so that unique() keeps one of the two.
+    opt_msgs <- if (inherits(fit, "glm") && !isTRUE(fit$converged))
+      "glm.fit: algorithm did not converge"
+    singular <- FALSE
+  }
   msgs <- unique(c(msgs, opt_msgs))
   list(fit = fit, singular = singular, messages = msgs,
        converged = length(msgs) == 0L && !singular)
+}
+
+# A model formula fitted by lmer(), or by lm() when it has no random terms, whatever the family.
+.fit_lmer <- function(formula, data, test = FALSE) {
+  .fit_model(formula, data, family = "gaussian", test = test, auto = FALSE)
 }
 
 # The empty per-replicate record, returned when a fit fails outright.
@@ -62,36 +199,51 @@
 #
 # Kept at top level so that only the arguments travel to PSOCK workers.
 #
-# `test` chooses the fitter. Satterthwaite p-values come from lmerTest and cost noticeably more
-# than the plain fit, so precision analysis, which needs only estimates and standard errors, asks
-# for the cheaper one.
-.design_rep <- function(i, spec, seeds, prep, formula, fnames, test = TRUE) {
-  s <- spec; s$seed <- seeds[i]
+# `test` chooses between the linear fitters. Satterthwaite p-values come from lmerTest and cost
+# noticeably more than the plain fit, so precision analysis, which needs only estimates and standard
+# errors, asks for the cheaper one. `auto` says whether pilotr derived the formula, which lets the
+# response family choose the fitter (see .fit_model()). `formula` may be a ladder from
+# .as_ladder(), whose rule .fit_rule() applies, and the record then names the rung kept as `rung`.
+# `alternative` chooses the p-value the power functions test against, two-sided or one-sided (see
+# .one_sided_p()). `sets`, the sets of coefficients a list `focal` names, asks for each set's joint
+# test in place of the single coefficients, and `fnames` then holds the sets' names (see
+# .joint_record()). A joint test is applied to the fit the ladder's rule kept.
+.design_rep <- function(i, spec, seeds, prep, formula, fnames, test = TRUE, auto = TRUE,
+                        alternative = "two.sided", sets = NULL) {
+  s <- spec; s[["seed"]] <- seeds[i]
   d <- prep(simulate_design(s, validate = FALSE))
-  f <- .fit_lmer(formula, d, test = test)
+  f <- .fit_rule(formula, d, family = spec[["response"]][["family"]], test = test, auto = auto)
   na <- stats::setNames(rep(NA_real_, length(fnames)), fnames)
   absent <- stats::setNames(logical(length(fnames)), fnames)
   if (is.null(f$fit))
     return(c(list(present = absent, est = na, se = na, p = na, coef_names = NULL,
-                  error = if (length(f$messages)) f$messages[1] else NA_character_),
+                  error = if (length(f$messages)) f$messages[1] else NA_character_,
+                  rung = f$rung),
              .fit_record_failed()))
+  if (!is.null(sets)) return(c(.joint_record(f, sets), list(rung = f$rung)))
 
   co <- if (test) tryCatch(summary(f$fit)$coefficients, error = function(e) NULL) else NULL
-  est <- lme4::fixef(f$fit)
+  # The test's column is named for its reference distribution: Pr(>|t|) for lmerTest's
+  # Satterthwaite test and for lm(), Pr(>|z|) for the Wald z of glm() and glmer().
+  pcol <- if (is.null(co)) NA_character_ else intersect(c("Pr(>|t|)", "Pr(>|z|)"), colnames(co))[1]
+  est <- if (inherits(f$fit, "merMod")) lme4::fixef(f$fit) else stats::coef(f$fit)
   se <- sqrt(diag(as.matrix(stats::vcov(f$fit))))
   present <- stats::setNames(fnames %in% names(est), fnames)
   e <- na; s_e <- na; pv <- na
   for (fn in fnames[present]) {
     e[fn] <- est[[fn]]
     s_e[fn] <- se[[fn]]
-    # lmerTest's Satterthwaite column is the p-value the power functions test against. When the
-    # cheaper fitter was used, or the column is missing, the p-value stays NA and the caller
-    # reports the effect as untested, and assumes nothing about it.
-    if (!is.null(co) && fn %in% rownames(co) && "Pr(>|t|)" %in% colnames(co))
-      pv[fn] <- co[fn, "Pr(>|t|)"]
+    # That column holds the p-value the power functions test against. When the cheaper fitter was
+    # used, or the column is missing, the p-value stays NA and the caller reports the effect as
+    # untested, and assumes nothing about it. A coefficient that lm() could not estimate, whose
+    # row summary() leaves out, is treated in the same way.
+    if (!is.na(pcol) && fn %in% rownames(co))
+      pv[fn] <- if (alternative == "two.sided") co[fn, pcol]
+                else .one_sided_p(co, fn, pcol, f$fit, alternative)
   }
   list(present = present, est = e, se = s_e, p = pv, coef_names = names(est), fitted = TRUE,
-       singular = f$singular, warned = length(f$messages) > 0L, converged = f$converged)
+       singular = f$singular, warned = length(f$messages) > 0L, converged = f$converged,
+       rung = f$rung)
 }
 
 # The focal coefficient names for a specification, in the naming the auto-derived model uses.
@@ -99,15 +251,23 @@
 # A specification's interaction keys are written "a:b", while model_data() materialises them as
 # columns named "a_b", so the focal names have to follow the columns.
 .default_focal <- function(spec) {
-  vapply(names(spec$fixed$coefficients), .us, character(1), USE.NAMES = FALSE)
+  vapply(names(spec[["fixed"]][["coefficients"]]), .us, character(1), USE.NAMES = FALSE)
 }
 
 # Resolve the `focal` argument to a character vector of names and, where given, their true values.
+# A list names sets of coefficients, each tested jointly, which have no true value, and the sets
+# are returned as `sets`.
 .resolve_focal <- function(focal, spec) {
+  if (is.list(focal)) {
+    sets <- .as_focal_sets(focal)
+    nms <- names(sets)
+    return(list(names = nms, true = stats::setNames(rep(NA_real_, length(nms)), nms),
+                sets = sets))
+  }
   if (is.null(focal)) {
     nms <- .default_focal(spec)
-    true <- vapply(names(spec$fixed$coefficients), function(k) spec$fixed$coefficients[[k]],
-                   numeric(1), USE.NAMES = FALSE)
+    coeffs <- spec[["fixed"]][["coefficients"]]
+    true <- vapply(names(coeffs), function(k) coeffs[[k]], numeric(1), USE.NAMES = FALSE)
     return(list(names = nms, true = stats::setNames(true, nms)))
   }
   if (!is.null(names(focal)) && is.numeric(focal))
